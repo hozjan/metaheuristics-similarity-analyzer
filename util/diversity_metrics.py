@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from enum import Enum
+from niapy.problems import Problem
 
 __all__ = [
     'PDC'
@@ -9,27 +10,39 @@ __all__ = [
 class DiversityMetric(Enum):
     PDC = 'pdc'
 
-def PDC(population):
-    r"""Calculate the Distance to Population Centroid diversity metric.
+def PDC(population, problem: Problem):
+    r"""Distance to Population Centroid.
+
+    Reference paper: 
+        Ursem, Rasmus. (2002). Diversity-Guided Evolutionary Algorithms. 2439. 10.1007/3-540-45712-7_45. 
 
     Args:
         population (numpy.ndarray): population.
+        problem (Problem): Optimization problem
 
     Returns:
         PDC value.
 
     """
     P, N = np.shape(population)
+    L = 0
     pdc = 0
-    centroid = np.zeros(N)
+
+    for lb, ub in zip(problem.lower, problem.upper):
+        L += math.pow(ub - lb, 2)
+    L = math.sqrt(L)
+
+    avg_point = np.zeros(N)
     for p in population:
         for j, x in enumerate(p):
-            centroid[j] += x
+            avg_point[j] += x
 
-    centroid = centroid / P
+    avg_point /= P
 
     for p in population:
+        sum = 0
         for j, x in enumerate(p):
-            pdc += math.pow(x - centroid[j], 2)
+            sum += math.pow(x - avg_point[j], 2)
+        pdc += math.sqrt(sum)
 
-    return pdc / P
+    return pdc / ( P * L)
