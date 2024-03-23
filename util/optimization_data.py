@@ -4,6 +4,7 @@ import numpy as np
 import json
 from json import JSONEncoder
 from collections import namedtuple
+from niapy.problems import Problem
 
 from util.diversity_metrics import PDC, DiversityMetric
 
@@ -27,23 +28,24 @@ class PopulationData:
 
         Args:
             population (Optional[numpy.ndarray]): Population.
-            population_fitnes (Optional[numpy.ndarray]): Population fitnes.
+            population_fitness (Optional[numpy.ndarray]): Population fitness.
         """
 
         self.population = population
         self.population_fitness = population_fitness
         self.metrics_values = {}
 
-    def calculate_metrics(self, metrics: List[DiversityMetric]):
+    def calculate_metrics(self, metrics: List[DiversityMetric], problem: Problem = None):
         r"""Calculate diversity metrics.
 
         Args:
             metrics (List[DiversityMetric]): List of metrics to calculate.
+            problem (Problem): Optimization problem.
         """
         for metric in metrics:
             match metric:
                 case DiversityMetric.PDC:
-                    self.metrics_values[metric.value] = PDC(self.population)
+                    self.metrics_values[metric.value] = PDC(self.population, problem)
 
 
 class SingleRunData:
@@ -58,7 +60,6 @@ class SingleRunData:
         problem_name: str = None,
         max_evals=None,
         max_iters=None,
-        json_file=None,
     ):
         r"""Archive the optimization data through iterations.
 

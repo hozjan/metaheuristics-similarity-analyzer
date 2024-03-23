@@ -18,7 +18,7 @@ def PDC(population, problem: Problem):
 
     Args:
         population (numpy.ndarray): population.
-        problem (Problem): Optimization problem
+        problem (Problem): Optimization problem.
 
     Returns:
         PDC value.
