@@ -6,7 +6,7 @@ from json import JSONEncoder
 from collections import namedtuple
 from niapy.problems import Problem
 
-from util.diversity_metrics import PDC, DiversityMetric
+from util.diversity_metrics import PDC, PED, PMD, DiversityMetric
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -46,6 +46,10 @@ class PopulationData:
             match metric:
                 case DiversityMetric.PDC:
                     self.metrics_values[metric.value] = PDC(self.population, problem)
+                case DiversityMetric.PED:
+                    self.metrics_values[metric.value] = PED(self.population)
+                case DiversityMetric.PMD:
+                    self.metrics_values[metric.value] = PMD(self.population)
 
 
 class SingleRunData:
