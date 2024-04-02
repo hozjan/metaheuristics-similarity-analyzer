@@ -3,7 +3,7 @@ import math
 from enum import Enum
 from niapy.problems import Problem
 
-__all__ = ["PDC", "PED", "PMD", "AAD"]
+__all__ = ["PDC", "PED", "PMD", "AAD", "PDI"]
 
 
 class DiversityMetric(Enum):
@@ -11,6 +11,7 @@ class DiversityMetric(Enum):
     PED = "ped"
     PMD = "pmd"
     AAD = "aad"
+    PDI = "pdi"
 
 
 def PDC(population, problem: Problem):
@@ -121,3 +122,52 @@ def AAD(population):
         aad += ad / P
 
     return aad / P
+
+
+def PDI(population, problem: Problem, epsilon=0.001):
+    r"""Population Diversity Index.
+
+    Reference paper:
+        Smit, S.K. & Szlávik, Zoltán & Eiben, A.. (2011). Population diversity index: A new measure for population diversity. 269-270. 10.1145/2001858.2002010.
+
+    Args:
+        population (numpy.ndarray): population.
+        problem (Problem): Optimization problem.
+        epsilon (float): scaling parameter in exclusive range (0, 1)
+
+    Returns:
+        PDI value.
+
+    """
+    # m - number of individuals
+    # n - number of dimensions
+    m, n = np.shape(population)
+
+    # expected distance between any two individuals in an uniform distribution over [0, 1]^n
+    a_n = math.pow(1 / m, 1 / n) * math.sqrt(n)
+    omega = -math.log(epsilon) / a_n
+    sigma = -math.log(m)/math.log(0.01)
+
+    # normalizing values to [0, 1]
+    for pi in range(m):
+        for xi in range(n):
+            population[pi][xi] = (population[pi][xi] - problem.lower[xi]) / (
+                problem.upper[xi] - problem.lower[xi]
+            )
+
+    # calculate numerator part of the pdi equation
+    sum = 0
+    for xi in population:
+        # average similarity of xi to members of population
+        p_hat = 0
+        for xj in population:
+            # calculate euclidean distance
+            euclidean_sum = 0
+            for _xi, _xj in zip(xi, xj):
+                euclidean_sum += math.pow(_xi - _xj, 2)
+            d = math.sqrt(euclidean_sum)
+            p_hat += math.exp(-omega * d) / m
+
+        sum += math.log(math.pow(p_hat, sigma))
+
+    return -sum / (m * math.log(m))
