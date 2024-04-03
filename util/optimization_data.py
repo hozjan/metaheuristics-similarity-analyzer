@@ -97,6 +97,15 @@ class SingleRunData:
 
         self.populations.append(population_data)
 
+    def get_population_metrics(self):
+        metrics = []
+        for population in self.populations:
+            row = []
+            for metric in population.metrics_values:
+                row.append(population.metrics_values[metric])
+            metrics.append(row)
+        return metrics
+
     def export_to_json(self, filename):
         r"""Export to json file.
 
@@ -115,21 +124,22 @@ class SingleRunData:
         with open(filename, "w") as outfile:
             outfile.write(json_object)
 
-    def import_from_json(self, filename):
-        r"""Import data from the json file.
+    @staticmethod
+    def import_from_json(filename):
+        r"""Import data from the json file and create new class instance.
 
         Args:
             filename (str): Filename of the input file.
         """
-
+        single_run = SingleRunData()
         file = open(filename)
         data_dict = json.load(file)
-        self.algorithm_name = data_dict["algorithm_name"]
-        self.algorithm_parameters = data_dict["algorithm_parameters"]
-        self.problem_name = data_dict["problem_name"]
-        self.max_evals = data_dict["max_evals"]
-        self.max_iters = data_dict["max_iters"]
-        self.populations.clear()
+        single_run.algorithm_name = data_dict["algorithm_name"]
+        single_run.algorithm_parameters = data_dict["algorithm_parameters"]
+        single_run.problem_name = data_dict["problem_name"]
+        single_run.max_evals = data_dict["max_evals"]
+        single_run.max_iters = data_dict["max_iters"]
+        single_run.populations.clear()
         for pop in data_dict["populations"]:
             pop_dict = json.loads(pop)
             pop_data = PopulationData(
@@ -137,4 +147,8 @@ class SingleRunData:
                 population_fitness=pop_dict["population_fitness"],
             )
             pop_data.metrics_values = pop_dict["metrics_values"]
-            self.populations.append(pop_data)
+            single_run.populations.append(pop_data)
+
+        return single_run
+
+
