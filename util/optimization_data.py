@@ -1,7 +1,9 @@
 from typing import Dict, Any, List
 from types import FunctionType
 import numpy as np
+import pandas as pd
 import json
+import sklearn.preprocessing
 from json import JSONEncoder
 from collections import namedtuple
 from niapy.problems import Problem
@@ -30,7 +32,6 @@ class PopulationData:
             population (Optional[numpy.ndarray]): Population.
             population_fitness (Optional[numpy.ndarray]): Population fitness.
         """
-
         self.population = population
         self.population_fitness = population_fitness
         self.metrics_values = {}
@@ -62,7 +63,6 @@ class SingleRunData:
     r"""Class for archiving optimization run data.
     Contains list of population data through iterations, run details such as problem used, algorithm used etc.
     """
-
     def __init__(
         self,
         algorithm_name: str = None,
@@ -80,7 +80,6 @@ class SingleRunData:
             max_evals (Optional[int]): Number of function evaluations.
             max_iters (Optional[int]): Number of generations or iterations.
         """
-
         self.algorithm_name = algorithm_name
         self.algorithm_parameters = algorithm_parameters
         self.problem_name = problem_name
@@ -94,16 +93,33 @@ class SingleRunData:
         Args:
             population (PopulationData): Population of type PopulationData.
         """
-
         self.populations.append(population_data)
 
-    def get_population_metrics(self):
-        metrics = []
-        for population in self.populations:
-            row = []
+    def get_diversity_metrics_values(self, normalize=False):
+        r"""Add population to list.
+
+        Args:
+            normalize (bool): method returns normalized values if true.
+
+        Returns:
+            pandas.DataFrame: metrics values truought the run
+        """
+        metrics = pd.DataFrame({})
+        metrics_abbr = []
+        metrics_values = []
+        for idx, population in enumerate(self.populations):
             for metric in population.metrics_values:
-                row.append(population.metrics_values[metric])
-            metrics.append(row)
+                if idx == 0:
+                    metrics_abbr.append(metric)
+                    metrics_values.append([])
+                metrics_values[metrics_abbr.index(metric)].append(population.metrics_values[metric])
+
+        if normalize:
+            metrics_values = sklearn.preprocessing.minmax_scale(metrics_values, feature_range=(0, 1), axis=1)
+
+        for idx, metric in enumerate(metrics_abbr):
+            metrics[metric] = metrics_values[idx]
+
         return metrics
 
     def export_to_json(self, filename):
@@ -112,7 +128,6 @@ class SingleRunData:
         Args:
             filename (str): Filename of the output file.
         """
-
         if self.algorithm_parameters is not None:
             for k, v in self.algorithm_parameters.items():
                 if isinstance(v, FunctionType):
@@ -150,5 +165,3 @@ class SingleRunData:
             single_run.populations.append(pop_data)
 
         return single_run
-
-
