@@ -3,7 +3,7 @@ import math
 from enum import Enum
 from niapy.problems import Problem
 
-__all__ = ["PDC", "PED", "PMD", "AAD", "PDI"]
+__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "PFSD"]
 
 
 class DiversityMetric(Enum):
@@ -12,6 +12,7 @@ class DiversityMetric(Enum):
     PMD = "pmd"
     AAD = "aad"
     PDI = "pdi"
+    PFSD = "pfsd"
 
 
 def PDC(population, problem: Problem):
@@ -146,7 +147,7 @@ def PDI(population, problem: Problem, epsilon=0.001):
     # expected distance between any two individuals in an uniform distribution over [0, 1]^n
     a_n = math.pow(1 / m, 1 / n) * math.sqrt(n)
     omega = -math.log(epsilon) / a_n
-    sigma = -math.log(m)/math.log(0.01)
+    sigma = -math.log(m) / math.log(0.01)
 
     # normalizing values to [0, 1]
     for pi in range(m):
@@ -171,3 +172,15 @@ def PDI(population, problem: Problem, epsilon=0.001):
         sum += math.log(math.pow(p_hat, sigma))
 
     return -sum / (m * math.log(m))
+
+
+def PFSD(population_fitness):
+    r"""Population Fitness Standard Deviation.
+
+    Args:
+        population_fitness (numpy.ndarray): population fitness.
+
+    Returns:
+        PFSD value.
+    """
+    return population_fitness.std()
