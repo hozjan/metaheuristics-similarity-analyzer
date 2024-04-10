@@ -9,6 +9,7 @@ from collections import namedtuple
 from niapy.problems import Problem
 
 from util.pop_diversity_metrics import PDC, PED, PMD, AAD, PDI, PFSD, PFMea, PFMed, PopDiversityMetric
+from util.indiv_diversity_metrics import IDT, ISI, IndivDiversityMetric
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -92,6 +93,7 @@ class SingleRunData:
         self.max_evals = max_evals
         self.max_iters = max_iters
         self.populations = []
+        self.indiv_metrics = {}
 
     def add_population(self, population_data: PopulationData):
         r"""Add population to list.
@@ -101,8 +103,8 @@ class SingleRunData:
         """
         self.populations.append(population_data)
 
-    def get_diversity_metrics_values(self, normalize=False):
-        r"""Add population to list.
+    def get_pop_diversity_metrics_values(self, normalize=False):
+        r"""Get population diversity metrics values.
 
         Args:
             normalize (bool): method returns normalized values if true.
@@ -127,6 +129,31 @@ class SingleRunData:
             metrics[metric] = metrics_values[idx]
 
         return metrics
+    
+    def get_indiv_diversity_metrics_values(self, normalize=False):
+        r"""Get individual diversity metrics values.
+
+        Args:
+            normalize (bool): method returns normalized values if true.
+
+        Returns:
+            pandas.DataFrame: metrics values throughout the run
+        """
+        _indiv_metrics = dict(self.indiv_metrics)
+
+        if normalize:
+            for metric in _indiv_metrics:
+                _indiv_metrics[metric] = sklearn.preprocessing.minmax_scale(_indiv_metrics[metric], feature_range=(0, 1))
+
+        return pd.DataFrame.from_dict(_indiv_metrics)
+    
+    def calculate_indiv_diversity_metrics(self):
+        r"""Calculate Individual diversity metrics. 
+            Call suggested after optimization task stopping condition reached
+            or when all populations added to the populations list.
+        """
+        self.indiv_metrics[IndivDiversityMetric.IDT.value] = IDT(self.populations, self.algorithm_parameters["population_size"])
+        self.indiv_metrics[IndivDiversityMetric.ISI.value] = ISI(self.populations, self.algorithm_parameters["population_size"])
 
     def export_to_json(self, filename):
         r"""Export to json file.
@@ -160,6 +187,7 @@ class SingleRunData:
         single_run.problem_name = data_dict["problem_name"]
         single_run.max_evals = data_dict["max_evals"]
         single_run.max_iters = data_dict["max_iters"]
+        single_run.indiv_metrics = data_dict["indiv_metrics"]
         single_run.populations.clear()
         for pop in data_dict["populations"]:
             pop_dict = json.loads(pop)
