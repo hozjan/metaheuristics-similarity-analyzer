@@ -6,7 +6,7 @@ from niapy.problems import Problem
 __all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "PFSD", "PFMea", "PFMed"]
 
 
-class DiversityMetric(Enum):
+class PopDiversityMetric(Enum):
     PDC = "pdc"
     PED = "ped"
     PMD = "pmd"

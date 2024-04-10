@@ -8,7 +8,7 @@ from json import JSONEncoder
 from collections import namedtuple
 from niapy.problems import Problem
 
-from util.diversity_metrics import PDC, PED, PMD, AAD, PDI, PFSD, PFMea, PFMed, DiversityMetric
+from util.pop_diversity_metrics import PDC, PED, PMD, AAD, PDI, PFSD, PFMea, PFMed, PopDiversityMetric
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -37,7 +37,7 @@ class PopulationData:
         self.metrics_values = {}
 
     def calculate_metrics(
-        self, metrics: List[DiversityMetric], problem: Problem = None
+        self, metrics: List[PopDiversityMetric], problem: Problem = None
     ):
         r"""Calculate diversity metrics.
 
@@ -47,21 +47,21 @@ class PopulationData:
         """
         for metric in metrics:
             match metric:
-                case DiversityMetric.PDC:
+                case PopDiversityMetric.PDC:
                     self.metrics_values[metric.value] = PDC(self.population, problem)
-                case DiversityMetric.PED:
+                case PopDiversityMetric.PED:
                     self.metrics_values[metric.value] = PED(self.population)
-                case DiversityMetric.PMD:
+                case PopDiversityMetric.PMD:
                     self.metrics_values[metric.value] = PMD(self.population)
-                case DiversityMetric.AAD:
+                case PopDiversityMetric.AAD:
                     self.metrics_values[metric.value] = AAD(self.population)
-                case DiversityMetric.PDI:
+                case PopDiversityMetric.PDI:
                     self.metrics_values[metric.value] = PDI(self.population, problem)
-                case DiversityMetric.PFSD:
+                case PopDiversityMetric.PFSD:
                     self.metrics_values[metric.value] = PFSD(self.population_fitness)
-                case DiversityMetric.PFMea:
+                case PopDiversityMetric.PFMea:
                     self.metrics_values[metric.value] = PFMea(self.population_fitness)
-                case DiversityMetric.PFMed:
+                case PopDiversityMetric.PFMed:
                     self.metrics_values[metric.value] = PFMed(self.population_fitness)
 
 
