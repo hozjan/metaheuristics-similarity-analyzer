@@ -3,7 +3,7 @@ import math
 from enum import Enum
 from niapy.problems import Problem
 
-__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "PFSD"]
+__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "PFSD", "PFMea", "PFMed"]
 
 
 class DiversityMetric(Enum):
@@ -13,6 +13,8 @@ class DiversityMetric(Enum):
     AAD = "aad"
     PDI = "pdi"
     PFSD = "pfsd"
+    PFMea = "pfmea"
+    PFMed = "pfmed"
 
 
 def PDC(population, problem: Problem):
@@ -140,9 +142,11 @@ def PDI(population, problem: Problem, epsilon=0.001):
         PDI value.
 
     """
+    _population = np.copy(population)
+
     # m - number of individuals
     # n - number of dimensions
-    m, n = np.shape(population)
+    m, n = np.shape(_population)
 
     # expected distance between any two individuals in an uniform distribution over [0, 1]^n
     a_n = math.pow(1 / m, 1 / n) * math.sqrt(n)
@@ -152,16 +156,16 @@ def PDI(population, problem: Problem, epsilon=0.001):
     # normalizing values to [0, 1]
     for pi in range(m):
         for xi in range(n):
-            population[pi][xi] = (population[pi][xi] - problem.lower[xi]) / (
+            _population[pi][xi] = (_population[pi][xi] - problem.lower[xi]) / (
                 problem.upper[xi] - problem.lower[xi]
             )
 
     # calculate numerator part of the pdi equation
     sum = 0
-    for xi in population:
+    for xi in _population:
         # average similarity of xi to members of population
         p_hat = 0
-        for xj in population:
+        for xj in _population:
             # calculate euclidean distance
             euclidean_sum = 0
             for _xi, _xj in zip(xi, xj):
@@ -184,3 +188,27 @@ def PFSD(population_fitness):
         PFSD value.
     """
     return population_fitness.std()
+
+
+def PFMea(population_fitness):
+    r"""Population Fitness Mean.
+
+    Args:
+        population_fitness (numpy.ndarray): population fitness.
+
+    Returns:
+        PFMea value.
+    """
+    return population_fitness.mean()
+
+
+def PFMed(population_fitness):
+    r"""Population Fitness Median.
+
+    Args:
+        population_fitness (numpy.ndarray): population fitness.
+
+    Returns:
+        PFMed value.
+    """
+    return np.median(population_fitness)

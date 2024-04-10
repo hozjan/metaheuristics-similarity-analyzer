@@ -8,7 +8,7 @@ from json import JSONEncoder
 from collections import namedtuple
 from niapy.problems import Problem
 
-from util.diversity_metrics import PDC, PED, PMD, AAD, PDI, PFSD, DiversityMetric
+from util.diversity_metrics import PDC, PED, PMD, AAD, PDI, PFSD, PFMea, PFMed, DiversityMetric
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -59,7 +59,10 @@ class PopulationData:
                     self.metrics_values[metric.value] = PDI(self.population, problem)
                 case DiversityMetric.PFSD:
                     self.metrics_values[metric.value] = PFSD(self.population_fitness)
-
+                case DiversityMetric.PFMea:
+                    self.metrics_values[metric.value] = PFMea(self.population_fitness)
+                case DiversityMetric.PFMed:
+                    self.metrics_values[metric.value] = PFMed(self.population_fitness)
 
 
 class SingleRunData:
@@ -105,7 +108,7 @@ class SingleRunData:
             normalize (bool): method returns normalized values if true.
 
         Returns:
-            pandas.DataFrame: metrics values truought the run
+            pandas.DataFrame: metrics values throughout the run
         """
         metrics = pd.DataFrame({})
         metrics_abbr = []
