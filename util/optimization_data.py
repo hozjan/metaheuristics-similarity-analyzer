@@ -8,8 +8,18 @@ from json import JSONEncoder
 from collections import namedtuple
 from niapy.problems import Problem
 
-from util.pop_diversity_metrics import PDC, PED, PMD, AAD, PDI, PFSD, PFMea, PFMed, PopDiversityMetric
-from util.indiv_diversity_metrics import IDT, ISI, IndivDiversityMetric
+from util.pop_diversity_metrics import (
+    PDC,
+    PED,
+    PMD,
+    AAD,
+    PDI,
+    PFSD,
+    PFMea,
+    PFMed,
+    PopDiversityMetric,
+)
+from util.indiv_diversity_metrics import IDT, ISI, IFMea, IFMed, IndivDiversityMetric
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -70,6 +80,7 @@ class SingleRunData:
     r"""Class for archiving optimization run data.
     Contains list of population data through iterations, run details such as problem used, algorithm used etc.
     """
+
     def __init__(
         self,
         algorithm_name: str = None,
@@ -120,16 +131,20 @@ class SingleRunData:
                 if idx == 0:
                     metrics_abbr.append(metric)
                     metrics_values.append([])
-                metrics_values[metrics_abbr.index(metric)].append(population.metrics_values[metric])
+                metrics_values[metrics_abbr.index(metric)].append(
+                    population.metrics_values[metric]
+                )
 
         if normalize:
-            metrics_values = sklearn.preprocessing.minmax_scale(metrics_values, feature_range=(0, 1), axis=1)
+            metrics_values = sklearn.preprocessing.minmax_scale(
+                metrics_values, feature_range=(0, 1), axis=1
+            )
 
         for idx, metric in enumerate(metrics_abbr):
             metrics[metric] = metrics_values[idx]
 
         return metrics
-    
+
     def get_indiv_diversity_metrics_values(self, normalize=False):
         r"""Get individual diversity metrics values.
 
@@ -143,17 +158,38 @@ class SingleRunData:
 
         if normalize:
             for metric in _indiv_metrics:
-                _indiv_metrics[metric] = sklearn.preprocessing.minmax_scale(_indiv_metrics[metric], feature_range=(0, 1))
+                _indiv_metrics[metric] = sklearn.preprocessing.minmax_scale(
+                    _indiv_metrics[metric], feature_range=(0, 1)
+                )
 
         return pd.DataFrame.from_dict(_indiv_metrics)
-    
-    def calculate_indiv_diversity_metrics(self):
-        r"""Calculate Individual diversity metrics. 
-            Call suggested after optimization task stopping condition reached
-            or when all populations added to the populations list.
+
+    def calculate_indiv_diversity_metrics(self, metrics):
+        r"""Calculate Individual diversity metrics.
+        Call suggested after optimization task stopping condition reached
+        or when all populations added to the populations list.
+
+        Args:
+            metrics (List[DiversityMetric]): List of metrics to calculate.
         """
-        self.indiv_metrics[IndivDiversityMetric.IDT.value] = IDT(self.populations, self.algorithm_parameters["population_size"])
-        self.indiv_metrics[IndivDiversityMetric.ISI.value] = ISI(self.populations, self.algorithm_parameters["population_size"])
+        for metric in metrics:
+            match metric:
+                case IndivDiversityMetric.IDT:
+                    self.indiv_metrics[IndivDiversityMetric.IDT.value] = IDT(
+                        self.populations, self.algorithm_parameters["population_size"]
+                    )
+                case IndivDiversityMetric.ISI:
+                    self.indiv_metrics[IndivDiversityMetric.ISI.value] = ISI(
+                        self.populations, self.algorithm_parameters["population_size"]
+                    )
+                case IndivDiversityMetric.IFMea:
+                    self.indiv_metrics[IndivDiversityMetric.IFMea.value] = IFMea(
+                        self.populations, self.algorithm_parameters["population_size"]
+                    )
+                case IndivDiversityMetric.IFMed:
+                    self.indiv_metrics[IndivDiversityMetric.IFMed.value] = IFMed(
+                        self.populations
+                    )
 
     def export_to_json(self, filename):
         r"""Export to json file.
