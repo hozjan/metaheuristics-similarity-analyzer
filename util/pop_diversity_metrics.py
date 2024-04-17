@@ -2,6 +2,7 @@ import numpy as np
 import math
 from enum import Enum
 from niapy.problems import Problem
+from niapy.util.distances import euclidean
 
 __all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "PFSD", "PFMea", "PFMed"]
 
@@ -33,7 +34,6 @@ def PDC(population, problem: Problem):
     """
     P, N = np.shape(population)
     L = 0
-    pdc = 0
 
     for lb, ub in zip(problem.lower, problem.upper):
         L += math.pow(ub - lb, 2)
@@ -46,11 +46,9 @@ def PDC(population, problem: Problem):
 
     avg_point /= P
 
+    pdc = 0
     for p in population:
-        sum = 0
-        for x, avg in zip(p, avg_point):
-            sum += math.pow(x - avg, 2)
-        pdc += math.sqrt(sum)
+        pdc += euclidean(p, avg_point)
 
     return pdc / (P * L)
 
@@ -69,11 +67,7 @@ def PED(population):
 
     for index_i, pi in enumerate(population):
         for pj in population[index_i + 1 :]:
-            sum = 0
-            for xi, xj in zip(pi, pj):
-                sum += math.pow(xi - xj, 2)
-            ped += math.sqrt(sum)
-
+            ped += euclidean(pi, pj)
     return ped
 
 
@@ -118,10 +112,7 @@ def AAD(population):
     for pi in population:
         ad = 0
         for p in population:
-            sum = 0
-            for x, xi in zip(p, pi):
-                sum += math.pow(xi - x, 2)
-            ad += math.sqrt(sum)
+            ad += euclidean(p, pi)
         aad += ad / P
 
     return aad / P
@@ -167,10 +158,7 @@ def PDI(population, problem: Problem, epsilon=0.001):
         p_hat = 0
         for xj in _population:
             # calculate euclidean distance
-            euclidean_sum = 0
-            for _xi, _xj in zip(xi, xj):
-                euclidean_sum += math.pow(_xi - _xj, 2)
-            d = math.sqrt(euclidean_sum)
+            d = euclidean(xi, xj)
             p_hat += math.exp(-omega * d) / m
 
         sum += math.log(math.pow(p_hat, sigma))

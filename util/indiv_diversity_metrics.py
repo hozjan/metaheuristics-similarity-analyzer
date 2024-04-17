@@ -1,6 +1,7 @@
 import numpy as np
 import math
 from enum import Enum
+from niapy.util.distances import euclidean
 
 
 __all__ = ["IDT", "ISI", "IFMea", "IFMed"]
@@ -27,14 +28,7 @@ def IDT(populations, pop_size):
     distances = np.zeros(pop_size)
     for t in range(len(populations) - 1):
         for p in range(pop_size):
-            # calculate euclidean distance
-            euclidean_sum = 0
-            for _xi, _xj in zip(
-                populations[t].population[p], populations[t + 1].population[p]
-            ):
-                euclidean_sum += math.pow(_xi - _xj, 2)
-            d = math.sqrt(euclidean_sum)
-            distances[p] += d
+            distances[p] += euclidean(populations[t].population[p], populations[t + 1].population[p])
 
     return distances
 
@@ -52,14 +46,8 @@ def ISI(populations, pop_size):
     isi = IDT(populations, pop_size)
 
     for p in range(pop_size):
-        # calculate euclidean distance of first and last line
-        euclidean_sum = 0
-        for _xi, _xj in zip(
-            populations[0].population[p],
-            populations[len(populations) - 1].population[p],
-        ):
-            euclidean_sum += math.pow(_xi - _xj, 2)
-        d = math.sqrt(euclidean_sum)
+        # calculate euclidean distance between positions in first and last iteration
+        d = euclidean(populations[0].population[p], populations[len(populations) - 1].population[p])
 
         if d != 0:
             isi[p] /= d
