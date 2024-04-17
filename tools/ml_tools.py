@@ -103,7 +103,9 @@ def get_data_loaders(
                 )
 
     if len(dataset_paths) == 0:
-        raise ValueError("Provided combination of parameters resulted in an empty dataset. Check your `dataset_path` and `problems`.")
+        raise ValueError(
+            "Provided combination of parameters resulted in an empty dataset. Check your `dataset_path` and `problems`."
+        )
 
     x_train, x_test = sklearn.model_selection.train_test_split(
         dataset_paths, test_size=test_size, shuffle=True, random_state=random_state

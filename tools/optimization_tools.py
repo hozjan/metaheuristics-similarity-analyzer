@@ -12,25 +12,34 @@ from pathlib import Path
 from util.optimization_data import SingleRunData, PopulationData
 from util.pop_diversity_metrics import PopDiversityMetric
 from util.indiv_diversity_metrics import IndivDiversityMetric
-from util.constants import RNG_SEED, DATASET_PATH
 
 __all__ = ["optimization", "optimization_worker", "optimization_runner"]
 
 
-def optimization(algorithm: Algorithm, task: Task, single_run_data: SingleRunData):
+def optimization(
+    algorithm: Algorithm,
+    task: Task,
+    single_run_data: SingleRunData,
+    rng_seed: int = None,
+):
     r"""An adaptation of NiaPy Algorithm run method.
 
     Args:
         algorithm (Algorithm): Algorithm.
         task (Task): Task with pre configured parameters.
         single_run_data (SingleRunData): Instance for archiving optimization results
+        rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
     """
     try:
         algorithm.callbacks.before_run()
-        algorithm.rng = default_rng(seed=RNG_SEED)
+        if rng_seed is not None:
+            algorithm.rng = default_rng(seed=rng_seed)
+
         pop, fpop, params = algorithm.init_population(task)
-        # reset seed to random
-        algorithm.rng = default_rng()
+
+        if rng_seed is not None:
+            algorithm.rng = default_rng()
+
         xb, fxb = algorithm.get_best(pop, fpop)
         while not task.stopping_condition():
             # save population data
@@ -77,7 +86,9 @@ def optimization(algorithm: Algorithm, task: Task, single_run_data: SingleRunDat
         return None, None
 
 
-def optimization_worker(problem, algorithm, max_iter, run_index):
+def optimization_worker(
+    problem, algorithm, max_iter, run_index, dataset_path, rng_seed: int = None
+):
     r"""Single optimization run execution.
 
     Args:
@@ -85,6 +96,8 @@ def optimization_worker(problem, algorithm, max_iter, run_index):
         problem (Problem): Optimization problem.
         max_iter (int): Optimization stopping condition.
         run_index (int): run index, used for file name.
+        dataset_path (str): Path to the dataset to be created.
+        rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
     """
     task = Task(problem, max_iters=max_iter)
 
@@ -95,10 +108,10 @@ def optimization_worker(problem, algorithm, max_iter, run_index):
         max_iters=max_iter,
     )
 
-    optimization(algorithm, task, single_run_data)
+    optimization(algorithm, task, single_run_data, rng_seed)
 
     # check if folder structure exists, if not create it
-    path = os.path.join(DATASET_PATH, algorithm.Name[0], problem.name())
+    path = os.path.join(dataset_path, algorithm.Name[0], problem.name())
     if os.path.exists(path) == False:
         Path(path).mkdir(parents=True, exist_ok=True)
 
@@ -110,6 +123,8 @@ def optimization_runner(
     problem: Problem,
     max_iter: int,
     runs: int,
+    dataset_path: str,
+    rng_seed: int = None,
     parallel_processing=False,
 ):
     r"""Optimization work splitter.
@@ -119,6 +134,8 @@ def optimization_runner(
         problem (Problem): Optimization problem.
         max_iter (int): Optimization stopping condition.
         runs (int): Number of runs to execute.
+        dataset_path (str): Path to the dataset to be created.
+        rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
         parallel_processing (Optional[bool]): Execute optimization runs in parallel over multiple processes.
     """
     if parallel_processing:
@@ -126,12 +143,7 @@ def optimization_runner(
         for r in range(runs):
             p = multiprocessing.Process(
                 target=optimization_worker,
-                args=(
-                    problem,
-                    algorithm,
-                    max_iter,
-                    r,
-                ),
+                args=(problem, algorithm, max_iter, r, dataset_path, rng_seed),
             )
             p.start()
             pool.append(p)
@@ -140,4 +152,4 @@ def optimization_runner(
             p.join()
     else:
         for r in range(runs):
-            optimization_worker(problem, algorithm, max_iter, r)
+            optimization_worker(problem, algorithm, max_iter, r, dataset_path, rng_seed)

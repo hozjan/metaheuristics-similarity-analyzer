@@ -7,10 +7,11 @@ import numpy as np
 import pygad
 from tools.optimization_tools import optimization_runner
 from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTM
+import shutil
+import os
 
 from util.constants import (
     RNG_SEED,
-    DATASET_PATH,
     BATCH_SIZE,
     EPOCHS,
     POP_SIZE,
@@ -22,6 +23,8 @@ from util.constants import (
     META_GA_SOLUTIONS_PER_POP
 )
 
+MODEL_FILE_NAME = "meta_ga_lstm_model.pt"
+META_DATASET_PATH = "./meta_dataset"
 
 def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     solution_iter = 0
@@ -37,11 +40,11 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     # gather optimization data
     for algorithm in algorithms:
         optimization_runner(
-            algorithm, problem, MAX_ITER, NUM_RUNS, parallel_processing=True
+            algorithm, problem, MAX_ITER, NUM_RUNS, META_DATASET_PATH, rng_seed=RNG_SEED, parallel_processing=True
         )
 
     train_data_loader, val_data_loader, test_data_loader, labels = get_data_loaders(
-        DATASET_PATH, BATCH_SIZE, problems=[OPTIMIZATION_PROBLEM], random_state=RNG_SEED
+        META_DATASET_PATH, BATCH_SIZE, problems=[OPTIMIZATION_PROBLEM], random_state=RNG_SEED
     )
 
     # model parameters
@@ -49,8 +52,6 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     model = LSTM(np.shape(pop_features)[2], np.shape(indiv_features)[1], len(labels))
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
     loss_fn = nn.CrossEntropyLoss()
-    model_file_name = f"meta_ga_lstm_model.pt"
-
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
     model.to(device)
@@ -62,10 +63,10 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
         loss_fn=loss_fn,
         optimizer=optimizer,
         device=device,
-        model_file_name=model_file_name,
+        model_file_name=MODEL_FILE_NAME,
     )
 
-    model = torch.load(model_file_name, map_location=torch.device(device))
+    model = torch.load(MODEL_FILE_NAME, map_location=torch.device(device))
     model.to(device)
     accuracy = nn_test(model, test_data_loader, device)
 
@@ -116,7 +117,14 @@ if __name__ == "__main__":
 
         meta_ga.run()
 
-    meta_ga.plot_fitness(save_dir="meta_ga_fitness_plot.png")
+    try:
+        print("Removing temporary data...")
+        shutil.rmtree(META_DATASET_PATH)
+        os.remove(MODEL_FILE_NAME)
+    except:
+        print("Removing temporary data failed!")
+
     meta_ga.save("meta_ga_instance")
+    meta_ga.plot_fitness(save_dir="meta_ga_fitness_plot.png")
     best_solutions = meta_ga.best_solutions
     print(f"Best solution: {best_solutions[-1]}")
