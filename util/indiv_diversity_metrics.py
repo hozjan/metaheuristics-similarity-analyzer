@@ -60,7 +60,9 @@ def ISI(populations, pop_size):
         ):
             euclidean_sum += math.pow(_xi - _xj, 2)
         d = math.sqrt(euclidean_sum)
-        isi[p] /= d
+
+        if d != 0:
+            isi[p] /= d
 
     return isi
 
