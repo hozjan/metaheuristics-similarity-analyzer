@@ -1,5 +1,9 @@
-from niapy.util.factory import _algorithm_options, _problem_options, get_algorithm, get_problem
-from niapy.problems.schwefel import Schwefel
+from niapy.util.factory import (
+    _algorithm_options,
+    _problem_options,
+    get_algorithm,
+    get_problem,
+)
 import torch
 import tqdm
 from torch import nn
@@ -20,11 +24,14 @@ from util.constants import (
     META_GA_GENERATIONS,
     OPTIMIZATION_PROBLEM,
     GENE_SPACES,
-    META_GA_SOLUTIONS_PER_POP
+    META_GA_SOLUTIONS_PER_POP,
+    POP_DIVERSITY_METRICS,
+    INDIV_DIVERSITY_METRICS,
 )
 
 MODEL_FILE_NAME = "meta_ga_lstm_model.pt"
 META_DATASET_PATH = "./meta_dataset"
+
 
 def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     solution_iter = 0
@@ -40,11 +47,22 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     # gather optimization data
     for algorithm in algorithms:
         optimization_runner(
-            algorithm, problem, MAX_ITER, NUM_RUNS, META_DATASET_PATH, rng_seed=RNG_SEED, parallel_processing=True
+            algorithm,
+            problem,
+            MAX_ITER,
+            NUM_RUNS,
+            META_DATASET_PATH,
+            POP_DIVERSITY_METRICS,
+            INDIV_DIVERSITY_METRICS,
+            rng_seed=RNG_SEED,
+            parallel_processing=True,
         )
 
     train_data_loader, val_data_loader, test_data_loader, labels = get_data_loaders(
-        META_DATASET_PATH, BATCH_SIZE, problems=[OPTIMIZATION_PROBLEM], random_state=RNG_SEED
+        META_DATASET_PATH,
+        BATCH_SIZE,
+        problems=[OPTIMIZATION_PROBLEM],
+        random_state=RNG_SEED,
     )
 
     # model parameters
@@ -72,8 +90,10 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
 
     return 1.0 - accuracy
 
+
 def on_generation_progress(ga):
-        progress_bar.update(1)
+    progress_bar.update(1)
+
 
 if __name__ == "__main__":
     combined_gene_space = []
@@ -83,18 +103,24 @@ if __name__ == "__main__":
     # assemble combined gene space for meta GA
     for alg_name in GENE_SPACES:
         if alg_name not in _algorithm_options():
-            raise KeyError(f"Could not find algorithm by name `{alg_name}` in the niapy library.")
+            raise KeyError(
+                f"Could not find algorithm by name `{alg_name}` in the niapy library."
+            )
         algorithm = get_algorithm(alg_name)
         for setting in GENE_SPACES[alg_name]:
             if not hasattr(algorithm, setting):
-                raise NameError(f"Algorithm `{alg_name}` has no attribute named `{setting}`.")
+                raise NameError(
+                    f"Algorithm `{alg_name}` has no attribute named `{setting}`."
+                )
             combined_gene_space.append(GENE_SPACES[alg_name][setting])
             low_ranges.append(GENE_SPACES[alg_name][setting]["low"])
             high_ranges.append(GENE_SPACES[alg_name][setting]["high"])
 
     # check if the provided optimization problem is correct
     if OPTIMIZATION_PROBLEM.lower() not in _problem_options():
-        raise KeyError(f"Could not find optimization problem by name `{OPTIMIZATION_PROBLEM}` in the niapy library.")
+        raise KeyError(
+            f"Could not find optimization problem by name `{OPTIMIZATION_PROBLEM}` in the niapy library."
+        )
 
     with tqdm.tqdm(total=META_GA_GENERATIONS) as progress_bar:
         meta_ga = pygad.GA(

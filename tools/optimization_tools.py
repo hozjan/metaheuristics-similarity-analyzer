@@ -20,6 +20,8 @@ def optimization(
     algorithm: Algorithm,
     task: Task,
     single_run_data: SingleRunData,
+    pop_diversity_metrics: list[PopDiversityMetric],
+    indiv_diversity_metrics: list[IndivDiversityMetric],
     rng_seed: int = None,
 ):
     r"""An adaptation of NiaPy Algorithm run method.
@@ -28,6 +30,8 @@ def optimization(
         algorithm (Algorithm): Algorithm.
         task (Task): Task with pre configured parameters.
         single_run_data (SingleRunData): Instance for archiving optimization results
+        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
+        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
     """
     try:
@@ -47,15 +51,7 @@ def optimization(
                 population=np.array(pop), population_fitness=np.array(fpop)
             )
             pop_data.calculate_metrics(
-                [
-                    PopDiversityMetric.PDC,
-                    PopDiversityMetric.PED,
-                    PopDiversityMetric.PMD,
-                    PopDiversityMetric.AAD,
-                    PopDiversityMetric.PFSD,
-                    PopDiversityMetric.PFMea,
-                    PopDiversityMetric.PFMed,
-                ],
+                pop_diversity_metrics,
                 task.problem,
             )
             single_run_data.add_population(pop_data)
@@ -67,14 +63,7 @@ def optimization(
             algorithm.callbacks.after_iteration(pop, fpop, xb, fxb, **params)
             task.next_iter()
         algorithm.callbacks.after_run()
-        single_run_data.calculate_indiv_diversity_metrics(
-            [
-                IndivDiversityMetric.IDT,
-                IndivDiversityMetric.ISI,
-                IndivDiversityMetric.IFMea,
-                IndivDiversityMetric.IFMed,
-            ]
-        )
+        single_run_data.calculate_indiv_diversity_metrics(indiv_diversity_metrics)
         return xb, fxb * task.optimization_type.value
     except BaseException as e:
         if (
@@ -87,7 +76,14 @@ def optimization(
 
 
 def optimization_worker(
-    problem, algorithm, max_iter, run_index, dataset_path, rng_seed: int = None
+    problem: Problem,
+    algorithm: Algorithm,
+    max_iter: int,
+    run_index: int,
+    dataset_path: str,
+    pop_diversity_metrics: list[PopDiversityMetric],
+    indiv_diversity_metrics: list[IndivDiversityMetric],
+    rng_seed: int = None,
 ):
     r"""Single optimization run execution.
 
@@ -97,6 +93,8 @@ def optimization_worker(
         max_iter (int): Optimization stopping condition.
         run_index (int): run index, used for file name.
         dataset_path (str): Path to the dataset to be created.
+        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
+        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
     """
     task = Task(problem, max_iters=max_iter)
@@ -108,7 +106,14 @@ def optimization_worker(
         max_iters=max_iter,
     )
 
-    optimization(algorithm, task, single_run_data, rng_seed)
+    optimization(
+        algorithm,
+        task,
+        single_run_data,
+        pop_diversity_metrics,
+        indiv_diversity_metrics,
+        rng_seed,
+    )
 
     # check if folder structure exists, if not create it
     path = os.path.join(dataset_path, algorithm.Name[0], problem.name())
@@ -124,6 +129,8 @@ def optimization_runner(
     max_iter: int,
     runs: int,
     dataset_path: str,
+    pop_diversity_metrics: list[PopDiversityMetric],
+    indiv_diversity_metrics: list[IndivDiversityMetric],
     rng_seed: int = None,
     parallel_processing=False,
 ):
@@ -135,15 +142,26 @@ def optimization_runner(
         max_iter (int): Optimization stopping condition.
         runs (int): Number of runs to execute.
         dataset_path (str): Path to the dataset to be created.
+        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
+        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
         parallel_processing (Optional[bool]): Execute optimization runs in parallel over multiple processes.
     """
     if parallel_processing:
         pool = []
-        for r in range(runs):
+        for r_idx in range(runs):
             p = multiprocessing.Process(
                 target=optimization_worker,
-                args=(problem, algorithm, max_iter, r, dataset_path, rng_seed),
+                args=(
+                    problem,
+                    algorithm,
+                    max_iter,
+                    r_idx,
+                    dataset_path,
+                    pop_diversity_metrics,
+                    indiv_diversity_metrics,
+                    rng_seed,
+                ),
             )
             p.start()
             pool.append(p)
@@ -151,5 +169,14 @@ def optimization_runner(
         for p in pool:
             p.join()
     else:
-        for r in range(runs):
-            optimization_worker(problem, algorithm, max_iter, r, dataset_path, rng_seed)
+        for r_idx in range(runs):
+            optimization_worker(
+                problem,
+                algorithm,
+                max_iter,
+                r_idx,
+                dataset_path,
+                pop_diversity_metrics,
+                indiv_diversity_metrics,
+                rng_seed,
+            )
