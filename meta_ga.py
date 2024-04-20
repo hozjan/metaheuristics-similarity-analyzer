@@ -95,6 +95,17 @@ def on_generation_progress(ga):
     progress_bar.update(1)
 
 
+def clean_tmp_data():
+    try:
+        print("Cleaning up meta GA temporary data...")
+        if os.path.exists(META_DATASET_PATH):
+            shutil.rmtree(META_DATASET_PATH)
+        if os.path.isfile(MODEL_FILE_NAME):
+            os.remove(MODEL_FILE_NAME)
+    except:
+        print("Cleanup failed!")
+
+
 if __name__ == "__main__":
     combined_gene_space = []
     low_ranges = []
@@ -122,6 +133,8 @@ if __name__ == "__main__":
             f"Could not find optimization problem by name `{OPTIMIZATION_PROBLEM}` in the niapy library."
         )
 
+    clean_tmp_data()
+
     with tqdm.tqdm(total=META_GA_GENERATIONS) as progress_bar:
         meta_ga = pygad.GA(
             num_generations=META_GA_GENERATIONS,
@@ -143,12 +156,7 @@ if __name__ == "__main__":
 
         meta_ga.run()
 
-    try:
-        print("Removing temporary data...")
-        shutil.rmtree(META_DATASET_PATH)
-        os.remove(MODEL_FILE_NAME)
-    except:
-        print("Removing temporary data failed!")
+    clean_tmp_data()
 
     meta_ga.save("meta_ga_instance")
     meta_ga.plot_fitness(save_dir="meta_ga_fitness_plot.png")
