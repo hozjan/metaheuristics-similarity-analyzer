@@ -8,7 +8,7 @@ Optimization parameters
 """
 DATASET_PATH = "./dataset"
 POP_SIZE = 40
-MAX_ITER = 300 # per run
+MAX_EVALS = 10000 # per run
 NUM_RUNS = 300 # per algorithm
 # metrics to calculate when performing optimization
 POP_DIVERSITY_METRICS = [

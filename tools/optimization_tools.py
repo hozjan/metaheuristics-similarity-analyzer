@@ -78,11 +78,12 @@ def optimization(
 def optimization_worker(
     problem: Problem,
     algorithm: Algorithm,
-    max_iter: int,
     run_index: int,
     dataset_path: str,
     pop_diversity_metrics: list[PopDiversityMetric],
     indiv_diversity_metrics: list[IndivDiversityMetric],
+    max_iters: int = np.inf,
+    max_evals: int = np.inf,
     rng_seed: int = None,
 ):
     r"""Single optimization run execution.
@@ -90,20 +91,22 @@ def optimization_worker(
     Args:
         algorithm (Algorithm): Algorithm.
         problem (Problem): Optimization problem.
-        max_iter (int): Optimization stopping condition.
         run_index (int): run index, used for file name.
         dataset_path (str): Path to the dataset to be created.
         pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
         indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
+        max_iters (Optional[int]): Individual optimization run stopping condition.
+        max_evals (Optional[int]): Individual optimization run stopping condition.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
     """
-    task = Task(problem, max_iters=max_iter)
+    task = Task(problem, max_iters=max_iters, max_evals=max_evals)
 
     single_run_data = SingleRunData(
         algorithm_name=algorithm.Name,
         algorithm_parameters=algorithm.get_parameters(),
         problem_name=problem.name(),
-        max_iters=max_iter,
+        max_iters=max_iters,
+        max_evals=max_evals,
     )
 
     optimization(
@@ -126,11 +129,12 @@ def optimization_worker(
 def optimization_runner(
     algorithm: Algorithm,
     problem: Problem,
-    max_iter: int,
     runs: int,
     dataset_path: str,
     pop_diversity_metrics: list[PopDiversityMetric],
     indiv_diversity_metrics: list[IndivDiversityMetric],
+    max_iters: int = np.inf,
+    max_evals: int = np.inf,
     rng_seed: int = None,
     parallel_processing=False,
 ):
@@ -139,11 +143,12 @@ def optimization_runner(
     Args:
         algorithm (Algorithm): Algorithm.
         problem (Problem): Optimization problem.
-        max_iter (int): Optimization stopping condition.
         runs (int): Number of runs to execute.
         dataset_path (str): Path to the dataset to be created.
         pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
         indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
+        max_iters (Optional[int]): Individual optimization run stopping condition.
+        max_evals (Optional[int]): Individual optimization run stopping condition.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
         parallel_processing (Optional[bool]): Execute optimization runs in parallel over multiple processes.
     """
@@ -155,11 +160,12 @@ def optimization_runner(
                 args=(
                     problem,
                     algorithm,
-                    max_iter,
                     r_idx,
                     dataset_path,
                     pop_diversity_metrics,
                     indiv_diversity_metrics,
+                    max_iters,
+                    max_evals,
                     rng_seed,
                 ),
             )
@@ -171,12 +177,13 @@ def optimization_runner(
     else:
         for r_idx in range(runs):
             optimization_worker(
-                problem,
-                algorithm,
-                max_iter,
-                r_idx,
-                dataset_path,
-                pop_diversity_metrics,
-                indiv_diversity_metrics,
-                rng_seed,
+                problem=problem,
+                algorithm=algorithm,
+                run_index=r_idx,
+                dataset_path=dataset_path,
+                pop_diversity_metrics=pop_diversity_metrics,
+                indiv_diversity_metrics=indiv_diversity_metrics,
+                max_iters=max_iters,
+                max_evals=max_evals,
+                rng_seed=rng_seed,
             )

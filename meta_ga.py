@@ -19,7 +19,7 @@ from util.constants import (
     BATCH_SIZE,
     EPOCHS,
     POP_SIZE,
-    MAX_ITER,
+    MAX_EVALS,
     NUM_RUNS,
     META_GA_GENERATIONS,
     OPTIMIZATION_PROBLEM,
@@ -49,11 +49,11 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
         optimization_runner(
             algorithm,
             problem,
-            MAX_ITER,
             NUM_RUNS,
             META_DATASET_PATH,
             POP_DIVERSITY_METRICS,
             INDIV_DIVERSITY_METRICS,
+            max_evals=MAX_EVALS,
             rng_seed=RNG_SEED,
             parallel_processing=True,
         )
