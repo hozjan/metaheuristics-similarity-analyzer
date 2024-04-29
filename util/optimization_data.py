@@ -172,7 +172,16 @@ class SingleRunData:
         Args:
             metrics (List[DiversityMetric]): List of metrics to calculate.
         """
+        
+        if IndivDiversityMetric.IDT in metrics and IndivDiversityMetric.ISI in metrics:
+            (
+                self.indiv_metrics[IndivDiversityMetric.ISI.value],
+                self.indiv_metrics[IndivDiversityMetric.IDT.value],
+            ) = ISI(self.populations, self.algorithm_parameters["population_size"], return_idt=True)
+
         for metric in metrics:
+            if metric.value in self.indiv_metrics:
+                continue
             match metric:
                 case IndivDiversityMetric.IDT:
                     self.indiv_metrics[IndivDiversityMetric.IDT.value] = IDT(

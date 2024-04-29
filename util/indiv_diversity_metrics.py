@@ -2,6 +2,7 @@ import numpy as np
 import math
 from enum import Enum
 from niapy.util.distances import euclidean
+import copy
 
 
 __all__ = ["IDT", "ISI", "IFMea", "IFMed"]
@@ -18,8 +19,8 @@ def IDT(populations, pop_size):
     r"""Individual Distance Traveled.
 
     Args:
-        populations (numpy.ndarray[PopulationData]): populations.
-        pop_size (int): population size
+        populations (numpy.ndarray[PopulationData]): Populations.
+        pop_size (int): Population size.
 
     Returns:
         numpy.ndarray: Array of IDT values.
@@ -28,39 +29,46 @@ def IDT(populations, pop_size):
     distances = np.zeros(pop_size)
     for t in range(len(populations) - 1):
         for p in range(pop_size):
-            distances[p] += euclidean(populations[t].population[p], populations[t + 1].population[p])
+            distances[p] += euclidean(
+                populations[t].population[p], populations[t + 1].population[p]
+            )
 
     return distances
 
 
-def ISI(populations, pop_size):
-    r"""Individual Sinuosity Index.
+def ISI(populations, pop_size, return_idt=False):
+    r"""Individual Sinuosity Index. Utilizes Individual Distance Traveled function.
 
     Args:
         populations (numpy.ndarray[PopulationData]): populations.
-        pop_size (int): population size
+        pop_size (int): population size.
+        return_idt (Optional[bool]): Also return Individual Distance Traveled.
 
     Returns:
-        numpy.ndarray: Array of ISI values.
+        numpy.ndarray: Array of ISI values and also IDT values based on arguments.
     """
     isi = IDT(populations, pop_size)
+    idt = copy.deepcopy(isi) if return_idt else None
 
     for p in range(pop_size):
         # calculate euclidean distance between positions in first and last iteration
-        d = euclidean(populations[0].population[p], populations[len(populations) - 1].population[p])
+        d = euclidean(
+            populations[0].population[p],
+            populations[len(populations) - 1].population[p],
+        )
 
         if d != 0:
             isi[p] /= d
 
-    return isi
+    return isi, idt if return_idt else isi
 
 
 def IFMea(populations, pop_size):
     r"""Individual Fitness Mean.
 
     Args:
-        populations (numpy.ndarray[PopulationData]): populations.
-        pop_size (int): population size
+        populations (numpy.ndarray[PopulationData]): Populations.
+        pop_size (int): Population size.
 
     Returns:
         numpy.ndarray: Array of IFMea values.
@@ -76,7 +84,7 @@ def IFMed(populations):
     r"""Individual Fitness Median.
 
     Args:
-        populations (numpy.ndarray[PopulationData]): populations.
+        populations (numpy.ndarray[PopulationData]): Populations.
 
     Returns:
         numpy.ndarray: Array of IFMed values.
