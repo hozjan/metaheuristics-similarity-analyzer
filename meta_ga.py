@@ -148,10 +148,11 @@ if __name__ == "__main__":
             keep_parents=1,
             crossover_type="two_points",
             mutation_type="random",
-            mutation_percent_genes=10,
+            mutation_percent_genes=30,
             gene_space=combined_gene_space,
             on_generation=on_generation_progress,
             save_best_solutions=True,
+            stop_criteria=["reach_1.0", "saturate_10"],
         )
 
         meta_ga.run()
