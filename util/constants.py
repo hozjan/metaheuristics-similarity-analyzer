@@ -14,8 +14,6 @@ NUM_RUNS = 300 # per algorithm
 POP_DIVERSITY_METRICS = [
     PopDiversityMetric.PDC,
     PopDiversityMetric.PED,
-    PopDiversityMetric.PMD,
-    PopDiversityMetric.AAD,
     PopDiversityMetric.PFSD,
     PopDiversityMetric.PFMea,
     PopDiversityMetric.PFMed,
