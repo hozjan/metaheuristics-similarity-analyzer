@@ -1,0 +1,12 @@
+*
+!metaheuristics_similarity_analyzer.ipynb
+!util
+!util/optimization_data.py
+!util/diversity_metrics.py
+!util/constants.py
+!tools
+!tools/ml_tools.py
+!tools/optimization_tools.py
+!pyproject.toml
+!.gitignore
+
