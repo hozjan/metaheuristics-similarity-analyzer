@@ -1,8 +1,10 @@
 *
 !metaheuristics_similarity_analyzer.ipynb
+!meta_ga.py
 !util
 !util/optimization_data.py
-!util/diversity_metrics.py
+!util/pop_diversity_metrics.py
+!util/indiv_diversity_metrics.py
 !util/constants.py
 !tools
 !tools/ml_tools.py
