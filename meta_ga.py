@@ -6,7 +6,6 @@ from niapy.util.factory import (
 )
 from niapy.problems import Problem
 import torch
-import tqdm
 from torch import nn
 import numpy as np
 import pygad
@@ -31,11 +30,15 @@ from util.constants import (
     INDIV_DIVERSITY_METRICS,
 )
 
-MODEL_FILE_NAME = "meta_ga_lstm_model.pt"
-META_DATASET_PATH = "./meta_dataset"
+META_GA_TMP_DATA = "meta_ga_tmp_data"
+MODEL_FILE_NAME = os.path.join(META_GA_TMP_DATA, "meta_ga_lstm_model.pt")
+META_DATASET_PATH = os.path.join(META_GA_TMP_DATA, "meta_dataset")
+
+__all__ = ["meta_ga_fitness_function", "clean_tmp_data", "run_meta_ga"]
 
 
 def meta_ga_fitness_function(meta_ga, solution, solution_idx):
+    r"""Fitness function of the meta genetic algorithm."""
     solution_iter = 0
     algorithms = []
     for alg_name in GENE_SPACES:
@@ -49,7 +52,7 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
         problem = OPTIMIZATION_PROBLEM
     else:
         problem = get_problem(OPTIMIZATION_PROBLEM)
-        
+
     # gather optimization data
     for algorithm in algorithms:
         optimization_runner(
@@ -67,7 +70,13 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     train_data_loader, val_data_loader, test_data_loader, labels = get_data_loaders(
         META_DATASET_PATH,
         BATCH_SIZE,
-        problems=[OPTIMIZATION_PROBLEM.name() if isinstance(OPTIMIZATION_PROBLEM, Problem) else OPTIMIZATION_PROBLEM],
+        problems=[
+            (
+                OPTIMIZATION_PROBLEM.name()
+                if isinstance(OPTIMIZATION_PROBLEM, Problem)
+                else OPTIMIZATION_PROBLEM
+            )
+        ],
         random_state=RNG_SEED,
     )
 
@@ -97,22 +106,34 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     return 1.0 - accuracy
 
 
-def on_generation_progress(ga):
-    progress_bar.update(1)
-
-
 def clean_tmp_data():
+    r"""Clean up temporary data created by the meta genetic algorithm."""
     try:
         print("Cleaning up meta GA temporary data...")
-        if os.path.exists(META_DATASET_PATH):
-            shutil.rmtree(META_DATASET_PATH)
-        if os.path.isfile(MODEL_FILE_NAME):
-            os.remove(MODEL_FILE_NAME)
+        if os.path.exists(META_GA_TMP_DATA):
+            shutil.rmtree(META_GA_TMP_DATA)
     except:
         print("Cleanup failed!")
 
 
-if __name__ == "__main__":
+def on_generation_progress(ga):
+    r"""Called after each genetic algorithm generation."""
+    if ga.save_best_solutions:
+        print(
+            f"\tGeneration {len(ga.best_solutions) - 1}/{META_GA_GENERATIONS} completed."
+        )
+    else:
+        print("\tGeneration completed.")
+
+
+def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
+    r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of optimization.
+
+    Args:
+        filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
+        plot_filename (Optional[str]): Name of the fitness plot image file.
+    """
+    
     combined_gene_space = []
     low_ranges = []
     high_ranges = []
@@ -134,38 +155,44 @@ if __name__ == "__main__":
             high_ranges.append(GENE_SPACES[alg_name][setting]["high"])
 
     # check if the provided optimization problem is correct
-    if not isinstance(OPTIMIZATION_PROBLEM, Problem) and OPTIMIZATION_PROBLEM.lower() not in _problem_options():
+    if (
+        not isinstance(OPTIMIZATION_PROBLEM, Problem)
+        and OPTIMIZATION_PROBLEM.lower() not in _problem_options()
+    ):
         raise KeyError(
             f"Could not find optimization problem by name `{OPTIMIZATION_PROBLEM}` in the niapy library."
         )
 
     clean_tmp_data()
 
-    with tqdm.tqdm(total=META_GA_GENERATIONS) as progress_bar:
-        meta_ga = pygad.GA(
-            num_generations=META_GA_GENERATIONS,
-            num_parents_mating=2,
-            fitness_func=meta_ga_fitness_function,
-            sol_per_pop=META_GA_SOLUTIONS_PER_POP,
-            num_genes=len(combined_gene_space),
-            init_range_low=low_ranges,
-            init_range_high=high_ranges,
-            parent_selection_type="sss",
-            keep_parents=1,
-            crossover_type="two_points",
-            mutation_type="random",
-            mutation_percent_genes=30,
-            gene_space=combined_gene_space,
-            on_generation=on_generation_progress,
-            save_best_solutions=True,
-            stop_criteria=["reach_1.0", "saturate_10"],
-        )
+    meta_ga = pygad.GA(
+        num_generations=META_GA_GENERATIONS,
+        num_parents_mating=2,
+        fitness_func=meta_ga_fitness_function,
+        sol_per_pop=META_GA_SOLUTIONS_PER_POP,
+        num_genes=len(combined_gene_space),
+        init_range_low=low_ranges,
+        init_range_high=high_ranges,
+        parent_selection_type="sss",
+        keep_parents=1,
+        crossover_type="two_points",
+        mutation_type="random",
+        mutation_percent_genes=30,
+        gene_space=combined_gene_space,
+        on_generation=on_generation_progress,
+        save_best_solutions=True,
+        stop_criteria=["reach_1.0", "saturate_10"],
+    )
 
-        meta_ga.run()
+    meta_ga.run()
 
     clean_tmp_data()
 
-    meta_ga.save("meta_ga_instance")
-    meta_ga.plot_fitness(save_dir="meta_ga_fitness_plot.png")
+    meta_ga.save(filename)
+    meta_ga.plot_fitness(save_dir=f"{plot_filename}.png")
     best_solutions = meta_ga.best_solutions
     print(f"Best solution: {best_solutions[-1]}")
+
+
+if __name__ == "__main__":
+    run_meta_ga()
