@@ -48,7 +48,10 @@ def optimization(
         while not task.stopping_condition():
             # save population data
             pop_data = PopulationData(
-                population=np.array(pop), population_fitness=np.array(fpop)
+                population=np.array(pop),
+                population_fitness=np.array(fpop),
+                best_solution=np.array(xb),
+                best_fitness=fxb * task.optimization_type.value,
             )
             pop_data.calculate_metrics(
                 pop_diversity_metrics,

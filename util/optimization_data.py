@@ -36,15 +36,19 @@ class JsonEncoder(JSONEncoder):
 class PopulationData:
     r"""Class for archiving population data. Contains population, diversity metrics etc."""
 
-    def __init__(self, population=None, population_fitness=None):
+    def __init__(self, population=None, population_fitness=None, best_solution=None, best_fitness=None):
         r"""Archive the population data and calculate diversity metrics.
 
         Args:
             population (Optional[numpy.ndarray]): Population.
             population_fitness (Optional[numpy.ndarray]): Population fitness.
+            best_solution (Optional[numpy.ndarray]): Best solution in the population.
+            best_fitness (Optional[float]): Fitness of the best solution in the population.
         """
         self.population = population
         self.population_fitness = population_fitness
+        self.best_solution = best_solution
+        self.best_fitness = best_fitness
         self.metrics_values = {}
 
     def calculate_metrics(
@@ -200,6 +204,19 @@ class SingleRunData:
                         self.populations
                     )
 
+    def get_best_fitness_values(self):
+        r"""Get array of best fitness values of all populations through the run.
+
+        Returns:
+            numpy.ndarray: best fitness values throughout the run
+        """
+        fitness_values = []
+        for p in self.populations:
+            fitness_values.append(p.best_fitness)
+
+        return fitness_values
+
+
     def export_to_json(self, filename):
         r"""Export to json file.
 
@@ -239,6 +256,8 @@ class SingleRunData:
             pop_data = PopulationData(
                 population=pop_dict["population"],
                 population_fitness=pop_dict["population_fitness"],
+                best_solution=pop_dict["best_solution"],
+                best_fitness=pop_dict["best_fitness"]
             )
             pop_data.metrics_values = pop_dict["metrics_values"]
             single_run.populations.append(pop_data)
