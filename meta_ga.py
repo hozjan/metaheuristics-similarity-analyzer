@@ -4,6 +4,7 @@ from niapy.util.factory import (
     get_algorithm,
     get_problem,
 )
+from niapy.problems import Problem
 import torch
 import tqdm
 from torch import nn
@@ -20,6 +21,7 @@ from util.constants import (
     EPOCHS,
     POP_SIZE,
     MAX_EVALS,
+    MAX_ITERS,
     NUM_RUNS,
     META_GA_GENERATIONS,
     OPTIMIZATION_PROBLEM,
@@ -43,7 +45,11 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
             solution_iter += 1
         algorithms.append(algorithm)
 
-    problem = get_problem(OPTIMIZATION_PROBLEM)
+    if isinstance(OPTIMIZATION_PROBLEM, Problem):
+        problem = OPTIMIZATION_PROBLEM
+    else:
+        problem = get_problem(OPTIMIZATION_PROBLEM)
+        
     # gather optimization data
     for algorithm in algorithms:
         optimization_runner(
@@ -53,7 +59,7 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
             META_DATASET_PATH,
             POP_DIVERSITY_METRICS,
             INDIV_DIVERSITY_METRICS,
-            max_evals=MAX_EVALS,
+            max_iters=MAX_ITERS,
             rng_seed=RNG_SEED,
             parallel_processing=True,
         )
@@ -61,7 +67,7 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     train_data_loader, val_data_loader, test_data_loader, labels = get_data_loaders(
         META_DATASET_PATH,
         BATCH_SIZE,
-        problems=[OPTIMIZATION_PROBLEM],
+        problems=[OPTIMIZATION_PROBLEM.name() if isinstance(OPTIMIZATION_PROBLEM, Problem) else OPTIMIZATION_PROBLEM],
         random_state=RNG_SEED,
     )
 
@@ -128,7 +134,7 @@ if __name__ == "__main__":
             high_ranges.append(GENE_SPACES[alg_name][setting]["high"])
 
     # check if the provided optimization problem is correct
-    if OPTIMIZATION_PROBLEM.lower() not in _problem_options():
+    if not isinstance(OPTIMIZATION_PROBLEM, Problem) and OPTIMIZATION_PROBLEM.lower() not in _problem_options():
         raise KeyError(
             f"Could not find optimization problem by name `{OPTIMIZATION_PROBLEM}` in the niapy library."
         )
