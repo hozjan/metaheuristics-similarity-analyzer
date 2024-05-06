@@ -1,3 +1,4 @@
+from typing import Any
 from niapy.util.factory import (
     _algorithm_options,
     _problem_options,
@@ -5,6 +6,7 @@ from niapy.util.factory import (
     get_problem,
 )
 from niapy.problems import Problem
+from datetime import datetime
 import torch
 from torch import nn
 import numpy as np
@@ -19,7 +21,6 @@ from util.constants import (
     BATCH_SIZE,
     EPOCHS,
     POP_SIZE,
-    MAX_EVALS,
     MAX_ITERS,
     NUM_RUNS,
     META_GA_GENERATIONS,
@@ -34,19 +35,18 @@ META_GA_TMP_DATA = "meta_ga_tmp_data"
 MODEL_FILE_NAME = os.path.join(META_GA_TMP_DATA, "meta_ga_lstm_model.pt")
 META_DATASET_PATH = os.path.join(META_GA_TMP_DATA, "meta_dataset")
 
-__all__ = ["meta_ga_fitness_function", "clean_tmp_data", "run_meta_ga"]
+__all__ = [
+    "meta_ga_fitness_function",
+    "clean_tmp_data",
+    "solution_to_algorithm_attributes",
+    "run_meta_ga",
+]
 
 
 def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     r"""Fitness function of the meta genetic algorithm."""
-    solution_iter = 0
-    algorithms = []
-    for alg_name in GENE_SPACES:
-        algorithm = get_algorithm(alg_name, population_size=POP_SIZE)
-        for setting in GENE_SPACES[alg_name]:
-            algorithm.__setattr__(setting, solution[solution_iter])
-            solution_iter += 1
-        algorithms.append(algorithm)
+
+    algorithms = solution_to_algorithm_attributes(solution, GENE_SPACES)
 
     if isinstance(OPTIMIZATION_PROBLEM, Problem):
         problem = OPTIMIZATION_PROBLEM
@@ -96,6 +96,7 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
         loss_fn=loss_fn,
         optimizer=optimizer,
         device=device,
+        patience=np.inf,
         model_file_name=MODEL_FILE_NAME,
     )
 
@@ -118,12 +119,46 @@ def clean_tmp_data():
 
 def on_generation_progress(ga):
     r"""Called after each genetic algorithm generation."""
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S %d.%m.%Y")
     if ga.save_best_solutions:
         print(
-            f"\tGeneration {len(ga.best_solutions) - 1}/{META_GA_GENERATIONS} completed."
+            f"\tGeneration {len(ga.best_solutions) - 1}/{META_GA_GENERATIONS} completed at {current_time}."
         )
     else:
-        print("\tGeneration completed.")
+        print(f"\tGeneration completed at {current_time}.")
+
+
+def solution_to_algorithm_attributes(
+    solution: list[float], gene_spaces: dict[str, dict[str, Any]]
+):
+    r"""Apply meta genetic algorithm solution to an corresponding algorithm based on the gene spaces used for the meta optimization.
+    Make sure the solution matches the gene space.
+
+    Args:
+        solution (list[float]): Meta genetic algorithm solution.
+        gene_spaces (dict[str, dict[str, Any]]): Gene spaces of the solution.
+
+    Returns:
+        list: Array of Algorithms configured based on solution and gene_space.
+    """
+    settings_counter = 0
+    for alg_name in gene_spaces:
+        settings_counter += len(gene_spaces[alg_name])
+    if settings_counter != len(solution):
+        raise ValueError(
+            f"Solution length does not match the count of the gene space settings."
+        )
+
+    solution_iter = 0
+    algorithms = []
+    for alg_name in gene_spaces:
+        algorithm = get_algorithm(alg_name, population_size=POP_SIZE)
+        for setting in gene_spaces[alg_name]:
+            algorithm.__setattr__(setting, solution[solution_iter])
+            solution_iter += 1
+        algorithms.append(algorithm)
+    return algorithms
 
 
 def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
@@ -133,7 +168,7 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
         filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
         plot_filename (Optional[str]): Name of the fitness plot image file.
     """
-    
+
     combined_gene_space = []
     low_ranges = []
     high_ranges = []
@@ -195,4 +230,8 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
 
 
 if __name__ == "__main__":
+    start = datetime.now()
     run_meta_ga()
+    end = datetime.now()
+    elapsed = end - start
+    print(f"Time elapsed: {elapsed}")
