@@ -11,9 +11,10 @@ import torch
 from torch import nn
 import numpy as np
 import pygad
-from tools.optimization_tools import optimization_runner
+from tools.optimization_tools import optimization_runner, optimization_worker
 from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTM
 import shutil
+import logging
 import os
 
 from util.constants import (
@@ -107,6 +108,45 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     return 1.0 - accuracy
 
 
+def ed_meta_ga_fitness_function(meta_ga, solution, solution_idx):
+    r"""Fitness function of the meta genetic algorithm based on euclidean distance."""
+
+    algorithms = solution_to_algorithm_attributes(solution, GENE_SPACES)
+
+    if isinstance(OPTIMIZATION_PROBLEM, Problem):
+        problem = OPTIMIZATION_PROBLEM
+    else:
+        problem = get_problem(OPTIMIZATION_PROBLEM)
+
+    # gather optimization data
+    data = []
+    for algorithm in algorithms:
+        algorithm_data = []
+        for _ in range(NUM_RUNS):
+            single_run_data = optimization_worker(
+                problem=problem,
+                algorithm=algorithm,
+                pop_diversity_metrics=POP_DIVERSITY_METRICS,
+                indiv_diversity_metrics=INDIV_DIVERSITY_METRICS,
+                max_iters=MAX_ITERS,
+                rng_seed=RNG_SEED,
+            )
+            algorithm_data.append(single_run_data)
+        data.append(algorithm_data)
+
+    euclidean_distance = 0
+
+    for first in data[0]:
+        for second in data[1]:
+            euclidean_distance += first.diversity_metrics_euclidean_distance(
+                second, include_fitness_convergence=True
+            )
+
+    euclidean_distance /= pow(NUM_RUNS, len(algorithms))
+
+    return 1.0 / (euclidean_distance + 0.0000000001)
+
+
 def clean_tmp_data():
     r"""Clean up temporary data created by the meta genetic algorithm."""
     try:
@@ -117,16 +157,15 @@ def clean_tmp_data():
         print("Cleanup failed!")
 
 
-def on_generation_progress(ga):
+def on_generation_progress(ga: pygad.GA):
     r"""Called after each genetic algorithm generation."""
-    now = datetime.now()
-    current_time = now.strftime("%H:%M:%S %d.%m.%Y")
-    if ga.save_best_solutions:
-        print(
-            f"\tGeneration {len(ga.best_solutions) - 1}/{META_GA_GENERATIONS} completed at {current_time}."
-        )
-    else:
-        print(f"\tGeneration completed at {current_time}.")
+    ga.logger.info(f"Generation = {ga.generations_completed}")
+    ga.logger.info(
+        f"->Fitness  = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[1]}"
+    )
+    ga.logger.info(
+        f"->Solution = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[0]}"
+    )
 
 
 def solution_to_algorithm_attributes(
@@ -200,23 +239,44 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
 
     clean_tmp_data()
 
+    level = logging.DEBUG
+    name = "./meta_ga_logfile.txt"
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    file_handler = logging.FileHandler(name, "a+", "utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_format = logging.Formatter(
+        "%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    file_handler.setFormatter(file_format)
+    logger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_format = logging.Formatter("%(message)s")
+    console_handler.setFormatter(console_format)
+    logger.addHandler(console_handler)
+
     meta_ga = pygad.GA(
         num_generations=META_GA_GENERATIONS,
-        num_parents_mating=2,
-        fitness_func=meta_ga_fitness_function,
+        num_parents_mating=int(META_GA_SOLUTIONS_PER_POP * 0.4),
+        fitness_func=ed_meta_ga_fitness_function,
         sol_per_pop=META_GA_SOLUTIONS_PER_POP,
         num_genes=len(combined_gene_space),
+        parent_selection_type="rws",
         init_range_low=low_ranges,
         init_range_high=high_ranges,
-        parent_selection_type="sss",
-        keep_parents=1,
         crossover_type="two_points",
         mutation_type="random",
         mutation_percent_genes=30,
         gene_space=combined_gene_space,
         on_generation=on_generation_progress,
         save_best_solutions=True,
-        stop_criteria=["reach_1.0", "saturate_10"],
+        stop_criteria="saturate_10",
+        parallel_processing=["process", 100],
+        logger=logger,
     )
 
     meta_ga.run()
