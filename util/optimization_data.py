@@ -176,8 +176,18 @@ class SingleRunData:
         return pd.DataFrame.from_dict(_indiv_metrics)
 
     def diversity_metrics_euclidean_distance(
-        self, run: "SingleRunData", normalize=False
+        self, run: "SingleRunData", include_fitness_convergence=False, normalize=False
     ):
+        r"""Calculate the sum of euclidean distances between corresponding diversity metrics of two individual runs.
+
+        Args:
+            run (SingleRunData): Single run data for comparison to the current instance.
+            include_fitness_convergence (bool): Also include euclidean distance of the fitness convergence.
+            normalize (bool): Method returns a sum of euclidean distances between normalized metrics if true.
+
+        Returns:
+            float: Sum of euclidean distances.
+        """
         first_pdm = np.transpose(
             self.get_pop_diversity_metrics_values(normalize).to_numpy(), (1, 0)
         )
@@ -197,6 +207,11 @@ class SingleRunData:
         s_pca = PCA(n_components=second_idm.shape[1])
         s_principal_components = s_pca.fit_transform(second_idm).flatten()
         euclidean_sum += euclidean(f_principal_components, s_principal_components)
+
+        if include_fitness_convergence:
+            first_fitness = self.get_best_fitness_values(normalize)
+            second_fitness = run.get_best_fitness_values(normalize)
+            euclidean_sum += euclidean(first_fitness, second_fitness)
 
         return euclidean_sum
 
@@ -240,15 +255,20 @@ class SingleRunData:
                         self.populations
                     )
 
-    def get_best_fitness_values(self):
+    def get_best_fitness_values(self, normalize=False):
         r"""Get array of best fitness values of all populations through the run.
 
         Returns:
             numpy.ndarray: best fitness values throughout the run
         """
-        fitness_values = []
+        fitness_values = np.array([])
         for p in self.populations:
-            fitness_values.append(p.best_fitness)
+            fitness_values = np.append(fitness_values, p.best_fitness)
+
+        if normalize:
+            fitness_values = sklearn.preprocessing.minmax_scale(
+                fitness_values, feature_range=(0, 1)
+            )
 
         return fitness_values
 
