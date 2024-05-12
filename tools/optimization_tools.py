@@ -81,26 +81,26 @@ def optimization(
 def optimization_worker(
     problem: Problem,
     algorithm: Algorithm,
-    run_index: int,
-    dataset_path: str,
     pop_diversity_metrics: list[PopDiversityMetric],
     indiv_diversity_metrics: list[IndivDiversityMetric],
     max_iters: int = np.inf,
     max_evals: int = np.inf,
+    dataset_path: str = None,
     rng_seed: int = None,
+    run_index: int = None,
 ):
     r"""Single optimization run execution.
 
     Args:
         algorithm (Algorithm): Algorithm.
         problem (Problem): Optimization problem.
-        run_index (int): run index, used for file name.
-        dataset_path (str): Path to the dataset to be created.
         pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
         indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
         max_iters (Optional[int]): Individual optimization run stopping condition.
         max_evals (Optional[int]): Individual optimization run stopping condition.
+        dataset_path (Optional[str]): Path to the dataset to be created.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
+        run_index (Optional[int]): run index, used for file name indexing.
     """
     task = Task(problem, max_iters=max_iters, max_evals=max_evals)
 
@@ -121,6 +121,13 @@ def optimization_worker(
         rng_seed,
     )
 
+    if dataset_path is None:
+        return single_run_data
+    
+    if run_index is None:
+        raise IndexError(
+            f"Run index must be provided in order to generate a valid dataset."
+        )
     # check if folder structure exists, if not create it
     path = os.path.join(dataset_path, algorithm.Name[0], problem.name())
     if os.path.exists(path) == False:
@@ -128,6 +135,7 @@ def optimization_worker(
 
     single_run_data.export_to_json(os.path.join(path, f"run_{run_index:05d}.json"))
 
+    return single_run_data
 
 def optimization_runner(
     algorithm: Algorithm,
@@ -163,13 +171,13 @@ def optimization_runner(
                 args=(
                     problem,
                     algorithm,
-                    r_idx,
-                    dataset_path,
                     pop_diversity_metrics,
                     indiv_diversity_metrics,
                     max_iters,
                     max_evals,
+                    dataset_path,
                     rng_seed,
+                    r_idx,
                 ),
             )
             p.start()
@@ -182,11 +190,11 @@ def optimization_runner(
             optimization_worker(
                 problem=problem,
                 algorithm=algorithm,
-                run_index=r_idx,
-                dataset_path=dataset_path,
                 pop_diversity_metrics=pop_diversity_metrics,
                 indiv_diversity_metrics=indiv_diversity_metrics,
                 max_iters=max_iters,
                 max_evals=max_evals,
+                dataset_path=dataset_path,
                 rng_seed=rng_seed,
+                run_index=r_idx,
             )
