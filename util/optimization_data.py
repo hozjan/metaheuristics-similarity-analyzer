@@ -5,8 +5,9 @@ import pandas as pd
 import json
 import sklearn.preprocessing
 from json import JSONEncoder
-from collections import namedtuple
+from niapy.util.distances import euclidean
 from niapy.problems import Problem
+from sklearn.decomposition import PCA
 
 from util.pop_diversity_metrics import (
     PDC,
@@ -36,7 +37,13 @@ class JsonEncoder(JSONEncoder):
 class PopulationData:
     r"""Class for archiving population data. Contains population, diversity metrics etc."""
 
-    def __init__(self, population=None, population_fitness=None, best_solution=None, best_fitness=None):
+    def __init__(
+        self,
+        population=None,
+        population_fitness=None,
+        best_solution=None,
+        best_fitness=None,
+    ):
         r"""Archive the population data and calculate diversity metrics.
 
         Args:
@@ -168,6 +175,31 @@ class SingleRunData:
 
         return pd.DataFrame.from_dict(_indiv_metrics)
 
+    def diversity_metrics_euclidean_distance(
+        self, run: "SingleRunData", normalize=False
+    ):
+        first_pdm = np.transpose(
+            self.get_pop_diversity_metrics_values(normalize).to_numpy(), (1, 0)
+        )
+        second_pdm = np.transpose(
+            run.get_pop_diversity_metrics_values(normalize).to_numpy(), (1, 0)
+        )
+
+        first_idm = self.get_indiv_diversity_metrics_values(normalize).to_numpy()
+        second_idm = run.get_indiv_diversity_metrics_values(normalize).to_numpy()
+
+        euclidean_sum = 0
+        for first, second in zip(first_pdm, second_pdm):
+            euclidean_sum += euclidean(first, second)
+
+        f_pca = PCA(n_components=first_idm.shape[1])
+        f_principal_components = f_pca.fit_transform(first_idm).flatten()
+        s_pca = PCA(n_components=second_idm.shape[1])
+        s_principal_components = s_pca.fit_transform(second_idm).flatten()
+        euclidean_sum += euclidean(f_principal_components, s_principal_components)
+
+        return euclidean_sum
+
     def calculate_indiv_diversity_metrics(self, metrics):
         r"""Calculate Individual diversity metrics.
         Call suggested after optimization task stopping condition reached
@@ -176,12 +208,16 @@ class SingleRunData:
         Args:
             metrics (List[DiversityMetric]): List of metrics to calculate.
         """
-        
+
         if IndivDiversityMetric.IDT in metrics and IndivDiversityMetric.ISI in metrics:
             (
                 self.indiv_metrics[IndivDiversityMetric.ISI.value],
                 self.indiv_metrics[IndivDiversityMetric.IDT.value],
-            ) = ISI(self.populations, self.algorithm_parameters["population_size"], return_idt=True)
+            ) = ISI(
+                self.populations,
+                self.algorithm_parameters["population_size"],
+                return_idt=True,
+            )
 
         for metric in metrics:
             if metric.value in self.indiv_metrics:
@@ -215,7 +251,6 @@ class SingleRunData:
             fitness_values.append(p.best_fitness)
 
         return fitness_values
-
 
     def export_to_json(self, filename):
         r"""Export to json file.
@@ -257,7 +292,7 @@ class SingleRunData:
                 population=pop_dict["population"],
                 population_fitness=pop_dict["population_fitness"],
                 best_solution=pop_dict["best_solution"],
-                best_fitness=pop_dict["best_fitness"]
+                best_fitness=pop_dict["best_fitness"],
             )
             pop_data.metrics_values = pop_dict["metrics_values"]
             single_run.populations.append(pop_data)
