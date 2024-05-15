@@ -53,7 +53,7 @@ class LSTM(nn.Module):
             hidden_size=hidden_dim,
             num_layers=num_layers,
             batch_first=True,
-            dropout=0.8,
+            dropout=0.3,
         )
         self.fc = nn.Linear(hidden_dim + aux_input_dim, num_labels)
 
@@ -156,14 +156,14 @@ def nn_train(
     optimizer,
     device,
     model_file_name,
-    patience=10,
+    patience=np.inf,
     verbal=False,
 ):
     loss_values = []
     val_loss_values = []
     acc_values = []
     val_acc_values = []
-    best_acc = 0.0
+    best_loss = 1.0
     trial_counter = 0
 
     for epoch in range(epochs):
@@ -221,12 +221,12 @@ def nn_train(
                 f"epoch: {epoch + 1}, loss: {loss_values[-1] :.10f}, val_loss: {val_loss_values[-1] :.10f}, acc: {acc_values[-1] :.10f}, val_acc: {val_acc_values[-1] :.10f}"
             )
 
-        if val_acc_values[-1] > best_acc:
+        if val_loss_values[-1] < best_loss:
             trial_counter = 0
-            best_acc = val_acc_values[-1]
+            best_loss = val_loss_values[-1]
             torch.save(model, model_file_name)
             if verbal:
-                print(f"Saving model with accuracy: {best_acc :.10f}")
+                print(f"Saving model with loss: {best_loss :.10f}")
         else:
             trial_counter += 1
             if trial_counter >= patience:
