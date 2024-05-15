@@ -44,7 +44,7 @@ class data_generator(torch.utils.data.Dataset):
 
 class LSTM(nn.Module):
     def __init__(
-        self, input_dim, aux_input_dim, num_labels, hidden_dim=256, num_layers=3
+        self, input_dim, aux_input_dim, num_labels, hidden_dim=256, num_layers=3, dropout=0.3
     ) -> None:
         super().__init__()
 
@@ -53,7 +53,7 @@ class LSTM(nn.Module):
             hidden_size=hidden_dim,
             num_layers=num_layers,
             batch_first=True,
-            dropout=0.3,
+            dropout=dropout,
         )
         self.fc = nn.Linear(hidden_dim + aux_input_dim, num_labels)
 
