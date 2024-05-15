@@ -570,6 +570,35 @@ def clean_tmp_data():
         print("Cleanup failed!")
 
 
+def get_logger(filename: str = "meta_ga_log_file"):
+    r"""Get logger for meta genetic algorithm. Outputs to file and console.
+
+    Args:
+        filename (Optional[str]): Log file name.
+    """
+    level = logging.DEBUG
+
+    logger = logging.getLogger("meta_ga_logger")
+    logger.setLevel(level)
+    logger.propagate = False
+
+    file_handler = logging.FileHandler(f"{filename}.txt", "a+", "utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_format = logging.Formatter(
+        "%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    file_handler.setFormatter(file_format)
+    logger.addHandler(file_handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_format = logging.Formatter("%(message)s")
+    console_handler.setFormatter(console_format)
+    logger.addHandler(console_handler)
+
+    return logger
+
+
 def on_generation_progress(ga: pygad.GA):
     r"""Called after each genetic algorithm generation."""
     ga.logger.info(f"Generation = {ga.generations_completed}")
@@ -652,26 +681,6 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
 
     clean_tmp_data()
 
-    level = logging.DEBUG
-    name = "./meta_ga_logfile.txt"
-
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-
-    file_handler = logging.FileHandler(name, "a+", "utf-8")
-    file_handler.setLevel(logging.DEBUG)
-    file_format = logging.Formatter(
-        "%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    file_handler.setFormatter(file_format)
-    logger.addHandler(file_handler)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_format = logging.Formatter("%(message)s")
-    console_handler.setFormatter(console_format)
-    logger.addHandler(console_handler)
-
     meta_ga = pygad.GA(
         num_generations=META_GA_GENERATIONS,
         num_parents_mating=int(META_GA_SOLUTIONS_PER_POP * 0.4),
@@ -689,7 +698,7 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
         save_best_solutions=True,
         stop_criteria="saturate_10",
         parallel_processing=["process", 100],
-        logger=logger,
+        logger=get_logger(),
     )
 
     meta_ga.run()
