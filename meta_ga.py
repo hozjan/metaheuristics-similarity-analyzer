@@ -15,6 +15,7 @@ from tools.optimization_tools import optimization_runner, optimization_worker
 from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTM
 import shutil
 import logging
+import graphviz
 import os
 
 from util.constants import (
@@ -30,13 +31,19 @@ from util.constants import (
     META_GA_SOLUTIONS_PER_POP,
     POP_DIVERSITY_METRICS,
     INDIV_DIVERSITY_METRICS,
+    LSTM_NUM_LAYERS,
+    LSTM_HIDDEN_DIM,
+    LSTM_DROPOUT,
+    VAL_SIZE,
+    TEST_SIZE,
 )
 
 META_GA_TMP_DATA = "meta_ga_tmp_data"
-MODEL_FILE_NAME = os.path.join(META_GA_TMP_DATA, "meta_ga_lstm_model.pt")
-META_DATASET_PATH = os.path.join(META_GA_TMP_DATA, "meta_dataset")
+MODEL_FILE_NAME = "meta_ga_lstm_model.pt"
+META_DATASET = "meta_dataset"
 
 __all__ = [
+    "meta_ga_info",
     "meta_ga_fitness_function",
     "clean_tmp_data",
     "solution_to_algorithm_attributes",
@@ -44,8 +51,405 @@ __all__ = [
 ]
 
 
+def meta_ga_info(
+    filename: str = "meta_ga_info",
+    table_background_color: str = "white",
+    table_border_color: str = "black",
+    graph_color: str = "grey",
+    sub_graph_color: str = "lightgrey",
+):
+    r"""Produces a scheme of meta genetic algorithm configuration.
+
+    Args:
+        filename (Optional[str]): Name of the scheme image file.
+        table_background_color (Optional[str]): Table background color.
+        table_border_color (Optional[str]): Table border color.
+        graph_color (Optional[str]): Graph background color.
+        sub_graph_color (Optional[str]): Sub graph background color.
+    """
+
+    gv = graphviz.Digraph("meta_ga_info", filename=filename)
+    gv.attr(rankdir="TD", compound="true")
+    gv.attr("node", shape="box")
+    gv.attr("graph", fontname="bold")
+
+    with gv.subgraph(name="cluster_0") as c:
+        c.attr(style="filled", color=graph_color, name="meta_ga", label="Meta GA")
+        c.node_attr.update(
+            style="filled",
+            color=table_border_color,
+            fillcolor=table_background_color,
+            shape="plaintext",
+            margin="0",
+        )
+        c.node(
+            name="meta_ga_parameters",
+            label=f"""<
+            <table border="0" cellborder="1" cellspacing="0">
+                <tr>
+                    <td colspan="2"><b>Parameters</b></td>
+                </tr>
+                <tr>
+                    <td>generations</td>
+                    <td>{META_GA_GENERATIONS}</td>
+                </tr>
+                <tr>
+                    <td>pop size</td>
+                    <td>{META_GA_SOLUTIONS_PER_POP}</td>
+                </tr>
+            </table>>""",
+        )
+
+        with c.subgraph(name="cluster_00") as cc:
+            cc.attr(
+                style="filled",
+                color=sub_graph_color,
+                name="meta_ga_algorithms",
+                label="Algorithms",
+            )
+            cc.node_attr.update(
+                style="filled",
+                color=table_border_color,
+                fillcolor=table_background_color,
+                shape="plaintext",
+                margin="0",
+            )
+            combined_gene_space_len = 0
+            for alg_idx, alg_name in enumerate(list(GENE_SPACES.keys())):
+                node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
+                    <tr>
+                        <td colspan="2"><b>{alg_name}</b></td>
+                    </tr>
+                    <tr>
+                        <td>pop size</td>
+                        <td>{POP_SIZE}</td>
+                    </tr>"""
+                for setting in GENE_SPACES[alg_name]:
+                    gene = ", ".join(
+                        str(value) for value in GENE_SPACES[alg_name][setting].values()
+                    )
+                    combined_gene_space_len += 1
+                    node_label += f"<tr><td>{setting}</td><td>[{gene}]<sub>g<i>{combined_gene_space_len}</i></sub></td></tr>"
+                node_label += "</table>>"
+                cc.node(name=f"gene_space_{alg_idx}", label=node_label)
+
+            combined_gene_string = f"""<
+            <table border="0" cellborder="1" cellspacing="0">
+                <tr>
+                    <td colspan="3"><b>Solution</b></td>
+                    <td><b>Fitness</b></td>
+                </tr>
+                <tr>
+                    <td>g<i><sub>1</sub></i></td>
+                    <td>...</td>
+                    <td>g<i><sub>{combined_gene_space_len}</sub></i></td>
+                    <td>?</td>
+                </tr>
+            </table>>"""
+            cc.node(name=f"combined_gene_space", label=combined_gene_string)
+
+            for alg_idx in range(len(list(GENE_SPACES.keys()))):
+                cc.edge(f"gene_space_{alg_idx}", "combined_gene_space")
+
+    with gv.subgraph(name="cluster_1") as c:
+        c.attr(
+            style="filled", color=graph_color, name="optimization", label="Optimization"
+        )
+        c.node_attr.update(
+            style="filled",
+            color=table_border_color,
+            fillcolor=table_background_color,
+            shape="plaintext",
+            margin="0",
+        )
+        c.node(
+            name="optimization_parameters",
+            label=f"""<
+            <table border="0" cellborder="1" cellspacing="0">
+                <tr>
+                    <td colspan="2"><b>Parameters</b></td>
+                </tr>
+                <tr>
+                    <td>max iters</td>
+                    <td>{MAX_ITERS}</td>
+                </tr>
+                <tr>
+                    <td>num runs</td>
+                    <td>{NUM_RUNS}</td>
+                </tr>
+                <tr>
+                    <td>problem</td>
+                    <td>{OPTIMIZATION_PROBLEM.name()}</td>
+                </tr>
+                <tr>
+                    <td>dimension</td>
+                    <td>{OPTIMIZATION_PROBLEM.dimension}</td>
+                </tr>
+            </table>>""",
+        )
+
+        with c.subgraph(name="cluster_10") as cc:
+            cc.attr(
+                style="filled",
+                color=sub_graph_color,
+                name="metrics",
+                label="Diversity Metrics",
+            )
+            cc.node_attr.update(
+                style="filled",
+                color=table_border_color,
+                fillcolor=table_background_color,
+                shape="plaintext",
+                margin="0",
+            )
+            pop_metrics_label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Pop Metrics</b></td></tr>'
+            for metric in POP_DIVERSITY_METRICS:
+                pop_metrics_label += f"""<tr><td>{metric.value}</td></tr>"""
+            pop_metrics_label += "</table>>"
+            cc.node(name=f"pop_metrics", label=pop_metrics_label)
+
+            indiv_metrics_label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Indiv Metrics</b></td></tr>'
+            for metric in INDIV_DIVERSITY_METRICS:
+                indiv_metrics_label += f"""<tr><td>{metric.value}</td></tr>"""
+            indiv_metrics_label += "</table>>"
+            cc.node(name=f"indiv_metrics", label=indiv_metrics_label)
+
+    with gv.subgraph(name="cluster_2") as c:
+        c.attr(
+            style="filled",
+            color=graph_color,
+            name="machine_learning",
+            label="Machine Learning",
+        )
+        c.node_attr.update(
+            style="filled",
+            color=table_border_color,
+            fillcolor=table_background_color,
+            shape="plaintext",
+            margin="0",
+        )
+        c.node(
+            name="ml_parameters",
+            label=f"""<
+            <table border="0" cellborder="1" cellspacing="0">
+                <tr>
+                    <td colspan="2"><b>Parameters</b></td>
+                </tr>
+                <tr>
+                    <td>epochs</td>
+                    <td>{EPOCHS}</td>
+                </tr>
+                <tr>
+                    <td>batch size</td>
+                    <td>{BATCH_SIZE}</td>
+                </tr>
+            </table>>""",
+        )
+        c.node(
+            name="dataset_parameters",
+            label=f"""<
+            <table border="0" cellborder="1" cellspacing="0">
+                <tr>
+                    <td colspan="2"><b>Dataset</b></td>
+                </tr>
+                <tr>
+                    <td>size</td>
+                    <td>{len(list(GENE_SPACES.keys()))} * {NUM_RUNS}</td>
+                </tr>
+                <tr>
+                    <td>train</td>
+                    <td>{int((1.0-VAL_SIZE-TEST_SIZE)*100)}%</td>
+                </tr>
+                <tr>
+                    <td>val</td>
+                    <td>{int(VAL_SIZE*100)}%</td>
+                </tr>
+                <tr>
+                    <td>test</td>
+                    <td>{int(TEST_SIZE*100)}%</td>
+                </tr>
+            </table>>""",
+        )
+
+        with c.subgraph(name="cluster_20") as cc:
+            cc.attr(
+                style="filled",
+                color=sub_graph_color,
+                name="architecture",
+                label="Architecture",
+            )
+            cc.node_attr.update(
+                style="filled",
+                color=table_border_color,
+                fillcolor=table_background_color,
+                shape="plaintext",
+                margin="0",
+            )
+            cc.node(
+                name="dense_parameters",
+                label=f"""<
+                <table border="0" cellborder="1" cellspacing="0">
+                    <tr>
+                        <td colspan="2"><b>Dense</b></td>
+                    </tr>
+                    <tr>
+                        <td>input size</td>
+                        <td>{LSTM_HIDDEN_DIM} + {len(INDIV_DIVERSITY_METRICS)*POP_SIZE}</td>
+                    </tr>
+                    <tr>
+                        <td>output size</td>
+                        <td>{len(list(GENE_SPACES.keys()))}</td>
+                    </tr>
+                </table>>""",
+            )
+            cc.node(
+                name="PCA_parameters",
+                label=f"""<
+                <table border="0" cellborder="1" cellspacing="0">
+                    <tr>
+                        <td colspan="2"><b>PCA</b></td>
+                    </tr>
+                    <tr>
+                        <td>components</td>
+                        <td>{len(INDIV_DIVERSITY_METRICS)}</td>
+                    </tr>
+                    <tr>
+                        <td>component len</td>
+                        <td>{POP_SIZE}</td>
+                    </tr>
+                </table>>""",
+            )
+            cc.node(
+                name="LSTM_parameters",
+                label=f"""<
+                <table border="0" cellborder="1" cellspacing="0">
+                    <tr>
+                        <td colspan="2"><b>LSTM</b></td>
+                    </tr>
+                    <tr>
+                        <td>input size</td>
+                        <td>{len(POP_DIVERSITY_METRICS)}</td>
+                    </tr>
+                    <tr>
+                        <td>hidden size</td>
+                        <td>{LSTM_HIDDEN_DIM}</td>
+                    </tr>
+                    <tr>
+                        <td>layers</td>
+                        <td>{LSTM_NUM_LAYERS}</td>
+                    </tr>
+                    <tr>
+                        <td>dropout</td>
+                        <td>{LSTM_DROPOUT}</td>
+                    </tr>
+                </table>>""",
+            )
+
+            cc.edge("LSTM_parameters", "dense_parameters")
+            cc.edge("PCA_parameters", "dense_parameters")
+
+    with gv.subgraph(name="cluster_3") as c:
+        c.attr(
+            style="dashed",
+            color=table_border_color,
+            name="population",
+            label="Single Optimization Run",
+        )
+        c.node_attr.update(
+            style="filled",
+            color=table_border_color,
+            fillcolor=table_background_color,
+            shape="plaintext",
+            margin="0",
+        )
+
+        c.node(
+            name="pop_scheme",
+            label=f"""<
+            <table border="0" cellborder="0" cellspacing="0">
+                <tr>
+                    <td>
+                        <table border="0" cellborder="1" cellspacing="10">
+                            <tr>
+                                <td><i><b>X</b><sub>i=1, t=1</sub></i></td>
+                                <td>...</td>
+                                <td><i><b>X</b><sub>i=1, t={MAX_ITERS}</sub></i></td>
+                            </tr>
+                            <tr>
+                                <td>...</td>
+                                <td>...</td>
+                                <td>...</td>
+                            </tr>
+                            <tr>
+                                <td><i><b>X</b><sub>i={POP_SIZE}, t=1</sub></i></td>
+                                <td>...</td>
+                                <td><i><b>X</b><sub>i={POP_SIZE}, t={MAX_ITERS}</sub></i></td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td>
+                        <table border="0" cellborder="0" cellspacing="10">
+                            <tr>
+                                <td><i><b>IM</b><sub>1</sub></i></td>
+                            </tr>
+                            <tr>
+                                <td>...</td>
+                            </tr>
+                            <tr>
+                                <td><i><b>IM</b><sub>{POP_SIZE}</sub></i></td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <table border="0" cellborder="0" cellspacing="0">
+                            <tr>
+                                <td><i><b>PM</b><sub>1</sub></i></td>
+                                <td>...</td>
+                                <td><i><b>PM</b><sub>{MAX_ITERS}</sub></i></td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td></td>
+                </tr>
+            </table>>""",
+        )
+
+    gv.edge(
+        tail_name="combined_gene_space",
+        head_name="pop_metrics",
+        label=" for each solution",
+        ltail="cluster_0",
+        lhead="cluster_1",
+    )
+    gv.edge(
+        tail_name="optimization_parameters",
+        head_name="pop_scheme",
+        ltail="cluster_1",
+        lhead="cluster_3",
+    )
+    gv.edge(tail_name="pop_scheme", head_name="dataset_parameters", ltail="cluster_3")
+    gv.edge(
+        tail_name="PCA_parameters",
+        head_name="meta_ga_parameters",
+        label=" model accuracy",
+        ltail="cluster_2",
+        lhead="cluster_0",
+    )
+
+    gv.attr(fontsize="25")
+
+    gv.render(format="png", cleanup=True)
+
+
 def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     r"""Fitness function of the meta genetic algorithm."""
+
+    _MODEL_FILE_NAME = os.path.join(
+        META_GA_TMP_DATA, f"{solution_idx}_{MODEL_FILE_NAME}"
+    )
+    _META_DATASET = os.path.join(META_GA_TMP_DATA, f"{solution_idx}_{META_DATASET}")
 
     algorithms = solution_to_algorithm_attributes(solution, GENE_SPACES)
 
@@ -60,17 +464,20 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
             algorithm,
             problem,
             NUM_RUNS,
-            META_DATASET_PATH,
+            _META_DATASET,
             POP_DIVERSITY_METRICS,
             INDIV_DIVERSITY_METRICS,
             max_iters=MAX_ITERS,
-            rng_seed=RNG_SEED,
+            rng_seed=None,
+            keep_pop_data=False,
             parallel_processing=True,
         )
 
     train_data_loader, val_data_loader, test_data_loader, labels = get_data_loaders(
-        META_DATASET_PATH,
-        BATCH_SIZE,
+        dataset_path=_META_DATASET,
+        batch_size=BATCH_SIZE,
+        val_size=VAL_SIZE,
+        test_size=TEST_SIZE,
         problems=[
             (
                 OPTIMIZATION_PROBLEM.name()
@@ -83,7 +490,14 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
 
     # model parameters
     pop_features, indiv_features, _ = next(iter(train_data_loader))
-    model = LSTM(np.shape(pop_features)[2], np.shape(indiv_features)[1], len(labels))
+    model = LSTM(
+        input_dim=np.shape(pop_features)[2],
+        aux_input_dim=np.shape(indiv_features)[1],
+        num_labels=len(labels),
+        hidden_dim=LSTM_HIDDEN_DIM,
+        num_layers=LSTM_NUM_LAYERS,
+        dropout=LSTM_DROPOUT,
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
     loss_fn = nn.CrossEntropyLoss()
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -97,15 +511,14 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
         loss_fn=loss_fn,
         optimizer=optimizer,
         device=device,
-        patience=np.inf,
-        model_file_name=MODEL_FILE_NAME,
+        model_file_name=_MODEL_FILE_NAME,
     )
 
-    model = torch.load(MODEL_FILE_NAME, map_location=torch.device(device))
+    model = torch.load(_MODEL_FILE_NAME, map_location=torch.device(device))
     model.to(device)
     accuracy = nn_test(model, test_data_loader, device)
 
-    return 1.0 - accuracy
+    return 1.0 - accuracy + 0.0000000001
 
 
 def ed_meta_ga_fitness_function(meta_ga, solution, solution_idx):
@@ -262,15 +675,15 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
     meta_ga = pygad.GA(
         num_generations=META_GA_GENERATIONS,
         num_parents_mating=int(META_GA_SOLUTIONS_PER_POP * 0.4),
-        fitness_func=ed_meta_ga_fitness_function,
+        fitness_func=meta_ga_fitness_function,
         sol_per_pop=META_GA_SOLUTIONS_PER_POP,
         num_genes=len(combined_gene_space),
         parent_selection_type="rws",
         init_range_low=low_ranges,
         init_range_high=high_ranges,
         crossover_type="two_points",
-        mutation_type="random",
-        mutation_percent_genes=30,
+        mutation_type="adaptive",
+        mutation_percent_genes=[60, 20],
         gene_space=combined_gene_space,
         on_generation=on_generation_progress,
         save_best_solutions=True,
@@ -290,6 +703,7 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
 
 
 if __name__ == "__main__":
+    meta_ga_info()
     start = datetime.now()
     run_meta_ga()
     end = datetime.now()
