@@ -272,12 +272,21 @@ class SingleRunData:
 
         return fitness_values
 
-    def export_to_json(self, filename):
+    def export_to_json(self, filename, keep_pop_data=True):
         r"""Export to json file.
 
         Args:
             filename (str): Filename of the output file.
+            keep_pop_data (Optional[bool]): Clear population solutions and fitness values in order to save space. Does not clear population metrics.
         """
+
+        if not keep_pop_data:
+            for pop in self.populations:
+                pop.population = None
+                pop.population_fitness = None
+                pop.best_solution = None
+                pop.best_fitness = None
+
         if self.algorithm_parameters is not None:
             for k, v in self.algorithm_parameters.items():
                 if isinstance(v, FunctionType):

@@ -88,6 +88,7 @@ def optimization_worker(
     dataset_path: str = None,
     rng_seed: int = None,
     run_index: int = None,
+    keep_pop_data: bool = True,
 ):
     r"""Single optimization run execution.
 
@@ -100,7 +101,8 @@ def optimization_worker(
         max_evals (Optional[int]): Individual optimization run stopping condition.
         dataset_path (Optional[str]): Path to the dataset to be created.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
-        run_index (Optional[int]): run index, used for file name indexing.
+        run_index (Optional[int]): Run index, used for file name indexing. Has no effect if dataset_path is None.
+        keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space on data export. Does not clear population metrics. Has no effect if dataset_path is None.
     """
     task = Task(problem, max_iters=max_iters, max_evals=max_evals)
 
@@ -123,7 +125,7 @@ def optimization_worker(
 
     if dataset_path is None:
         return single_run_data
-    
+
     if run_index is None:
         raise IndexError(
             f"Run index must be provided in order to generate a valid dataset."
@@ -133,9 +135,12 @@ def optimization_worker(
     if os.path.exists(path) == False:
         Path(path).mkdir(parents=True, exist_ok=True)
 
-    single_run_data.export_to_json(os.path.join(path, f"run_{run_index:05d}.json"))
+    single_run_data.export_to_json(
+        os.path.join(path, f"run_{run_index:05d}.json"), keep_pop_data=keep_pop_data
+    )
 
     return single_run_data
+
 
 def optimization_runner(
     algorithm: Algorithm,
@@ -147,7 +152,8 @@ def optimization_runner(
     max_iters: int = np.inf,
     max_evals: int = np.inf,
     rng_seed: int = None,
-    parallel_processing=False,
+    keep_pop_data: bool = True,
+    parallel_processing: bool = False,
 ):
     r"""Optimization work splitter.
 
@@ -161,6 +167,7 @@ def optimization_runner(
         max_iters (Optional[int]): Individual optimization run stopping condition.
         max_evals (Optional[int]): Individual optimization run stopping condition.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
+        keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space on data export. Does not clear population metrics.
         parallel_processing (Optional[bool]): Execute optimization runs in parallel over multiple processes.
     """
     if parallel_processing:
@@ -178,6 +185,7 @@ def optimization_runner(
                     dataset_path,
                     rng_seed,
                     r_idx,
+                    keep_pop_data
                 ),
             )
             p.start()
@@ -197,4 +205,5 @@ def optimization_runner(
                 dataset_path=dataset_path,
                 rng_seed=rng_seed,
                 run_index=r_idx,
+                keep_pop_data=keep_pop_data
             )
