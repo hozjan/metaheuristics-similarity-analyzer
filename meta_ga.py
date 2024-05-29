@@ -26,11 +26,20 @@ from util.constants import (
     MAX_ITERS,
     NUM_RUNS,
     META_GA_GENERATIONS,
+    META_GA_PERCENT_PARENTS_MATING,
+    META_GA_SOLUTIONS_PER_POP,
+    META_GA_PARENT_SELECTION_TYPE,
+    META_GA_K_TOURNAMENT,
+    META_GA_CROSSOVER_TYPE,
+    META_GA_MUTATION_TYPE,
+    META_GA_CROSSOVER_PROBABILITY,
+    META_GA_MUTATION_NUM_GENES,
+    META_GA_KEEP_ELITISM,
     OPTIMIZATION_PROBLEM,
     GENE_SPACES,
-    META_GA_SOLUTIONS_PER_POP,
     POP_DIVERSITY_METRICS,
     INDIV_DIVERSITY_METRICS,
+    N_PCA_COMPONENTS,
     LSTM_NUM_LAYERS,
     LSTM_HIDDEN_DIM,
     LSTM_DROPOUT,
@@ -82,9 +91,7 @@ def meta_ga_info(
             shape="plaintext",
             margin="0",
         )
-        c.node(
-            name="meta_ga_parameters",
-            label=f"""<
+        meta_ga_parameters_label = f"""<
             <table border="0" cellborder="1" cellspacing="0">
                 <tr>
                     <td colspan="2"><b>Parameters</b></td>
@@ -97,7 +104,51 @@ def meta_ga_info(
                     <td>pop size</td>
                     <td>{META_GA_SOLUTIONS_PER_POP}</td>
                 </tr>
-            </table>>""",
+                <tr>
+                    <td>parent selection</td>
+                    <td>{META_GA_PARENT_SELECTION_TYPE}</td>
+                </tr>
+                """
+        
+        if META_GA_PARENT_SELECTION_TYPE == "tournament":
+            meta_ga_parameters_label += f"""
+                <tr>
+                    <td>K tournament</td>
+                    <td>{META_GA_K_TOURNAMENT}</td>
+                </tr>"""
+        meta_ga_parameters_label += f"""
+                <tr>
+                    <td>parents</td>
+                    <td>{META_GA_PERCENT_PARENTS_MATING} %</td>
+                </tr>
+                <tr>
+                    <td>crossover type</td>
+                    <td>{META_GA_CROSSOVER_TYPE}</td>
+                </tr>
+                <tr>
+                    <td>mutation type</td>
+                    <td>{META_GA_MUTATION_TYPE}</td>
+                </tr>
+                <tr>
+                    <td>crossover prob.</td>
+                    <td>{META_GA_CROSSOVER_PROBABILITY}</td>
+                </tr>
+                <tr>
+                    <td>mutate num genes</td>
+                    <td>{META_GA_MUTATION_NUM_GENES}</td>
+                </tr>
+                <tr>
+                    <td>keep elitism</td>
+                    <td>{META_GA_KEEP_ELITISM}</td>
+                </tr>
+                <tr>
+                    <td>rng seed</td>
+                    <td>{RNG_SEED}</td>
+                </tr>
+            </table>>"""
+        c.node(
+            name="meta_ga_parameters",
+            label=meta_ga_parameters_label
         )
 
         with c.subgraph(name="cluster_00") as cc:
@@ -129,7 +180,7 @@ def meta_ga_info(
                         str(value) for value in GENE_SPACES[alg_name][setting].values()
                     )
                     combined_gene_space_len += 1
-                    node_label += f"<tr><td>{setting}</td><td>[{gene}]<sub>g<i>{combined_gene_space_len}</i></sub></td></tr>"
+                    node_label += f"<tr><td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td></tr>"
                 node_label += "</table>>"
                 cc.node(name=f"gene_space_{alg_idx}", label=node_label)
 
@@ -143,7 +194,7 @@ def meta_ga_info(
                     <td>g<i><sub>1</sub></i></td>
                     <td>...</td>
                     <td>g<i><sub>{combined_gene_space_len}</sub></i></td>
-                    <td>?</td>
+                    <td port="gene_fitness">?</td>
                 </tr>
             </table>>"""
             cc.node(name=f"combined_gene_space", label=combined_gene_string)
@@ -243,6 +294,14 @@ def meta_ga_info(
                     <td>batch size</td>
                     <td>{BATCH_SIZE}</td>
                 </tr>
+                <tr>
+                    <td>optimizer</td>
+                    <td>Adam</td>
+                </tr>
+                <tr>
+                    <td>loss</td>
+                    <td>CrossEntropy</td>
+                </tr>
             </table>>""",
         )
         c.node(
@@ -258,15 +317,15 @@ def meta_ga_info(
                 </tr>
                 <tr>
                     <td>train</td>
-                    <td>{int((1.0-VAL_SIZE-TEST_SIZE)*100)}%</td>
+                    <td>{int((1.0-VAL_SIZE-TEST_SIZE)*100)} %</td>
                 </tr>
                 <tr>
                     <td>val</td>
-                    <td>{int(VAL_SIZE*100)}%</td>
+                    <td>{int(VAL_SIZE*100)} %</td>
                 </tr>
                 <tr>
                     <td>test</td>
-                    <td>{int(TEST_SIZE*100)}%</td>
+                    <td>{int(TEST_SIZE*100)} %</td>
                 </tr>
             </table>>""",
         )
@@ -276,7 +335,7 @@ def meta_ga_info(
                 style="filled",
                 color=sub_graph_color,
                 name="architecture",
-                label="Architecture",
+                label="Model Architecture",
             )
             cc.node_attr.update(
                 style="filled",
@@ -294,7 +353,7 @@ def meta_ga_info(
                     </tr>
                     <tr>
                         <td>input size</td>
-                        <td>{LSTM_HIDDEN_DIM} + {len(INDIV_DIVERSITY_METRICS)*POP_SIZE}</td>
+                        <td>{LSTM_HIDDEN_DIM + N_PCA_COMPONENTS*POP_SIZE}</td>
                     </tr>
                     <tr>
                         <td>output size</td>
@@ -302,6 +361,31 @@ def meta_ga_info(
                     </tr>
                 </table>>""",
             )
+            with cc.subgraph(name="cluster_200") as ccc:
+                ccc.attr(
+                    style="dashed",
+                    color=table_border_color,
+                    name="population",
+                    label="Data loader",
+                )
+                ccc.node_attr.update(
+                    style="filled",
+                    color=table_border_color,
+                    fillcolor=table_background_color,
+                    shape="box",
+                )
+                ccc.node(
+                    name="indiv_metrics_loader",
+                    color=table_border_color,
+                    label="Indiv Metrics",
+                    margin="0.1,0,0.1,0",
+                )
+                ccc.node(
+                    name="pop_metrics_loader",
+                    color=table_border_color,
+                    label="Pop Metrics",
+                    margin="0.1,0,0.1,0",
+                )
             cc.node(
                 name="PCA_parameters",
                 label=f"""<
@@ -311,10 +395,10 @@ def meta_ga_info(
                     </tr>
                     <tr>
                         <td>components</td>
-                        <td>{len(INDIV_DIVERSITY_METRICS)}</td>
+                        <td>{N_PCA_COMPONENTS}</td>
                     </tr>
                     <tr>
-                        <td>component len</td>
+                        <td>samples</td>
                         <td>{POP_SIZE}</td>
                     </tr>
                 </table>>""",
@@ -345,8 +429,14 @@ def meta_ga_info(
                 </table>>""",
             )
 
-            cc.edge("LSTM_parameters", "dense_parameters")
-            cc.edge("PCA_parameters", "dense_parameters")
+            cc.edge("LSTM_parameters", "dense_parameters", label=f"{LSTM_HIDDEN_DIM}")
+            cc.edge(
+                "PCA_parameters",
+                "dense_parameters",
+                label=f"{N_PCA_COMPONENTS*POP_SIZE}",
+            )
+            cc.edge("pop_metrics_loader", "LSTM_parameters")
+            cc.edge("indiv_metrics_loader", "PCA_parameters")
 
     with gv.subgraph(name="cluster_3") as c:
         c.attr(
@@ -419,8 +509,7 @@ def meta_ga_info(
     gv.edge(
         tail_name="combined_gene_space",
         head_name="pop_metrics",
-        label=" for each solution",
-        ltail="cluster_0",
+        label=" for each algorithm\nper solution",
         lhead="cluster_1",
     )
     gv.edge(
@@ -432,10 +521,9 @@ def meta_ga_info(
     gv.edge(tail_name="pop_scheme", head_name="dataset_parameters", ltail="cluster_3")
     gv.edge(
         tail_name="PCA_parameters",
-        head_name="meta_ga_parameters",
-        label=" model accuracy",
+        head_name="combined_gene_space:gene_fitness",
+        label=" model accuracy\non test dataset",
         ltail="cluster_2",
-        lhead="cluster_0",
     )
 
     gv.attr(fontsize="25")
@@ -461,14 +549,14 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     # gather optimization data
     for algorithm in algorithms:
         optimization_runner(
-            algorithm,
-            problem,
-            NUM_RUNS,
-            _META_DATASET,
-            POP_DIVERSITY_METRICS,
-            INDIV_DIVERSITY_METRICS,
+            algorithm=algorithm,
+            problem=problem,
+            runs=NUM_RUNS,
+            dataset_path=_META_DATASET,
+            pop_diversity_metrics=POP_DIVERSITY_METRICS,
+            indiv_diversity_metrics=INDIV_DIVERSITY_METRICS,
             max_iters=MAX_ITERS,
-            rng_seed=None,
+            rng_seed=RNG_SEED,
             keep_pop_data=False,
             parallel_processing=True,
         )
@@ -478,6 +566,7 @@ def meta_ga_fitness_function(meta_ga, solution, solution_idx):
         batch_size=BATCH_SIZE,
         val_size=VAL_SIZE,
         test_size=TEST_SIZE,
+        n_pca_components=N_PCA_COMPONENTS,
         problems=[
             (
                 OPTIMIZATION_PROBLEM.name()
@@ -653,6 +742,8 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
     combined_gene_space = []
     low_ranges = []
     high_ranges = []
+    random_mutation_min_val = []
+    random_mutation_max_val = []
     # check if all values in the provided gene spaces are correct and
     # assemble combined gene space for meta GA
     for alg_name in GENE_SPACES:
@@ -669,6 +760,8 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
             combined_gene_space.append(GENE_SPACES[alg_name][setting])
             low_ranges.append(GENE_SPACES[alg_name][setting]["low"])
             high_ranges.append(GENE_SPACES[alg_name][setting]["high"])
+            random_mutation_max_val.append(abs(GENE_SPACES[alg_name][setting]["high"] - GENE_SPACES[alg_name][setting]["low"]) * 0.5)
+            random_mutation_min_val.append(-random_mutation_max_val[-1])
 
     # check if the provided optimization problem is correct
     if (
@@ -681,23 +774,33 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
 
     clean_tmp_data()
 
+    num_parents_mating = int(
+        META_GA_SOLUTIONS_PER_POP * (META_GA_PERCENT_PARENTS_MATING / 100)
+    )
+
     meta_ga = pygad.GA(
         num_generations=META_GA_GENERATIONS,
-        num_parents_mating=int(META_GA_SOLUTIONS_PER_POP * 0.4),
+        num_parents_mating=num_parents_mating,
+        keep_elitism=META_GA_KEEP_ELITISM,
+        allow_duplicate_genes=False,
         fitness_func=meta_ga_fitness_function,
         sol_per_pop=META_GA_SOLUTIONS_PER_POP,
         num_genes=len(combined_gene_space),
-        parent_selection_type="rws",
+        parent_selection_type=META_GA_PARENT_SELECTION_TYPE,
+        K_tournament=META_GA_K_TOURNAMENT,
         init_range_low=low_ranges,
         init_range_high=high_ranges,
-        crossover_type="two_points",
-        mutation_type="adaptive",
-        mutation_percent_genes=[60, 20],
+        crossover_type=META_GA_CROSSOVER_TYPE,
+        crossover_probability=META_GA_CROSSOVER_PROBABILITY,
+        mutation_type=META_GA_MUTATION_TYPE,
+        mutation_num_genes=META_GA_MUTATION_NUM_GENES,
+        random_mutation_min_val=random_mutation_min_val,
+        random_mutation_max_val=random_mutation_max_val,
         gene_space=combined_gene_space,
         on_generation=on_generation_progress,
         save_best_solutions=True,
         stop_criteria="saturate_10",
-        parallel_processing=["process", 100],
+        parallel_processing=["process", META_GA_SOLUTIONS_PER_POP],
         logger=get_logger(),
     )
 
