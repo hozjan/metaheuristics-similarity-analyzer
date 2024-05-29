@@ -16,10 +16,11 @@ __all__ = ["data_generator", "LSTM", "get_data_loaders", "nn_train", "nn_test"]
 
 
 class data_generator(torch.utils.data.Dataset):
-    def __init__(self, data_path_list, labels) -> None:
+    def __init__(self, data_path_list, labels, n_pca_components) -> None:
         super().__init__()
         self.data_path_list = data_path_list
         self.labels = labels
+        self.n_pca_components = n_pca_components
 
     def __len__(self):
         return len(self.data_path_list)
@@ -31,14 +32,13 @@ class data_generator(torch.utils.data.Dataset):
             normalize=True
         ).to_numpy()
 
-        pca = PCA(n_components=indiv_metrics.shape[1])
-        principal_components = pca.fit_transform(indiv_metrics).flatten()
-        variance = pca.explained_variance_ratio_
+        pca = PCA(n_components=self.n_pca_components)
+        principal_components = pca.fit_transform(indiv_metrics).flatten(order="F")
 
         return (
             torch.from_numpy(pop_metrics).float(),
             torch.from_numpy(principal_components).float(),
-            torch.tensor(self.labels.index(run.algorithm_name[0])),
+            torch.tensor(self.labels.index(run.algorithm_name[1])),
         )
 
 
@@ -71,6 +71,7 @@ def get_data_loaders(
     batch_size,
     val_size=0.2,
     test_size=0.2,
+    n_pca_components: int = 3,
     problems: list[str] = None,
     random_state=None,
 ):
@@ -81,6 +82,7 @@ def get_data_loaders(
         batch_size (int): Batch size of the data loaders.
         val_size (Optional[float]): Proportion of the dataset used for validation.
         test_size (Optional[float]): Proportion of the dataset used for testing.
+        n_pca_components (Optional[int]): Number of PCA components to use per learning sample.
         problems (Optional[list[str]]): Names of the optimization problems to include in the dataset of the loaders. Includes all if not provided.
         random_state (Optional[int]): Random seed for dataset shuffle, provide for reproducible results.
 
@@ -117,7 +119,7 @@ def get_data_loaders(
         random_state=random_state,
     )
 
-    train_dataset = data_generator(x_train, labels)
+    train_dataset = data_generator(x_train, labels, n_pca_components)
     train_data_loader = data.DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -126,7 +128,7 @@ def get_data_loaders(
         num_workers=os.cpu_count(),
     )
 
-    val_dataset = data_generator(x_val, labels)
+    val_dataset = data_generator(x_val, labels, n_pca_components)
     val_data_loader = data.DataLoader(
         val_dataset,
         batch_size=batch_size,
@@ -135,7 +137,7 @@ def get_data_loaders(
         num_workers=os.cpu_count(),
     )
 
-    test_dataset = data_generator(x_test, labels)
+    test_dataset = data_generator(x_test, labels, n_pca_components)
     test_data_loader = data.DataLoader(
         test_dataset,
         batch_size=1,
