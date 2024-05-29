@@ -116,6 +116,7 @@ class SingleRunData:
         self.max_iters = max_iters
         self.populations = []
         self.indiv_metrics = {}
+        self.pop_metrics = {}
 
     def add_population(self, population_data: PopulationData):
         r"""Add population to list.
@@ -134,27 +135,25 @@ class SingleRunData:
         Returns:
             pandas.DataFrame: metrics values throughout the run
         """
-        metrics = pd.DataFrame({})
-        metrics_abbr = []
-        metrics_values = []
-        for idx, population in enumerate(self.populations):
-            for metric in population.metrics_values:
-                if idx == 0:
-                    metrics_abbr.append(metric)
-                    metrics_values.append([])
-                metrics_values[metrics_abbr.index(metric)].append(
-                    population.metrics_values[metric]
-                )
+        if len(self.pop_metrics.keys()) == 0:
+            for idx, population in enumerate(self.populations):
+                for metric in population.metrics_values:
+                    if idx == 0:
+                        self.pop_metrics[metric] = []
+                    self.pop_metrics[metric].append(
+                        population.metrics_values[metric]
+                    )
+
+        _pop_metrics = dict(self.pop_metrics)
 
         if normalize:
-            metrics_values = sklearn.preprocessing.minmax_scale(
-                metrics_values, feature_range=(0, 1), axis=1
-            )
+            for metric in _pop_metrics:
+                _pop_metrics[metric][-1] = 0.0
+                _pop_metrics[metric] = sklearn.preprocessing.minmax_scale(
+                    _pop_metrics[metric], feature_range=(0, 1)
+                )
 
-        for idx, metric in enumerate(metrics_abbr):
-            metrics[metric] = metrics_values[idx]
-
-        return metrics
+        return pd.DataFrame.from_dict(_pop_metrics)
 
     def get_indiv_diversity_metrics_values(self, normalize=False):
         r"""Get individual diversity metrics values.
@@ -281,11 +280,8 @@ class SingleRunData:
         """
 
         if not keep_pop_data:
-            for pop in self.populations:
-                pop.population = None
-                pop.population_fitness = None
-                pop.best_solution = None
-                pop.best_fitness = None
+            self.get_pop_diversity_metrics_values()
+            self.populations = None
 
         if self.algorithm_parameters is not None:
             for k, v in self.algorithm_parameters.items():
@@ -314,7 +310,11 @@ class SingleRunData:
         single_run.max_evals = data_dict["max_evals"]
         single_run.max_iters = data_dict["max_iters"]
         single_run.indiv_metrics = data_dict["indiv_metrics"]
+        single_run.pop_metrics = data_dict["pop_metrics"]
         single_run.populations.clear()
+        if data_dict["populations"] is None:
+            return single_run
+        
         for pop in data_dict["populations"]:
             pop_dict = json.loads(pop)
             pop_data = PopulationData(
