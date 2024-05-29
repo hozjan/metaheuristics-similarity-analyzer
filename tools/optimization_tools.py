@@ -38,6 +38,8 @@ def optimization(
         algorithm.callbacks.before_run()
         if rng_seed is not None:
             algorithm.rng = default_rng(seed=rng_seed)
+        else:
+            algorithm.rng = default_rng()
 
         pop, fpop, params = algorithm.init_population(task)
 
@@ -115,12 +117,12 @@ def optimization_worker(
     )
 
     optimization(
-        algorithm,
-        task,
-        single_run_data,
-        pop_diversity_metrics,
-        indiv_diversity_metrics,
-        rng_seed,
+        algorithm=algorithm,
+        task=task,
+        single_run_data=single_run_data,
+        pop_diversity_metrics=pop_diversity_metrics,
+        indiv_diversity_metrics=indiv_diversity_metrics,
+        rng_seed=rng_seed,
     )
 
     if dataset_path is None:
@@ -131,7 +133,7 @@ def optimization_worker(
             f"Run index must be provided in order to generate a valid dataset."
         )
     # check if folder structure exists, if not create it
-    path = os.path.join(dataset_path, algorithm.Name[0], problem.name())
+    path = os.path.join(dataset_path, algorithm.Name[1], problem.name())
     if os.path.exists(path) == False:
         Path(path).mkdir(parents=True, exist_ok=True)
 
