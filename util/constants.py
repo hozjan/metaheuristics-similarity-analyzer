@@ -8,7 +8,7 @@ from niapy.problems.zakharov import Zakharov
 import numpy as np
 
 
-RNG_SEED = 42
+RNG_SEED = None
 
 """
 Optimization parameters
@@ -16,8 +16,8 @@ Optimization parameters
 DATASET_PATH = "./dataset"
 POP_SIZE = 30
 MAX_EVALS = 10000  # per run
-MAX_ITERS = 150  # per run
-NUM_RUNS = 100  # per algorithm
+MAX_ITERS = 100  # per run
+NUM_RUNS = 150  # per algorithm
 # metrics to calculate when performing optimization
 POP_DIVERSITY_METRICS = [
     PopDiversityMetric.AAD,
@@ -37,11 +37,12 @@ INDIV_DIVERSITY_METRICS = [
 """
 Machine learning parameters
 """
-BATCH_SIZE = 10
+BATCH_SIZE = 20
 EPOCHS = 100
+N_PCA_COMPONENTS = 3
 LSTM_NUM_LAYERS = 3
-LSTM_HIDDEN_DIM = 256
-LSTM_DROPOUT = 0.3
+LSTM_HIDDEN_DIM = 128
+LSTM_DROPOUT = 0.2
 VAL_SIZE = 0.2
 TEST_SIZE = 0.2
 
@@ -51,21 +52,29 @@ Meta GA parameters
 """
 META_GA_GENERATIONS = 10
 META_GA_SOLUTIONS_PER_POP = 10
+META_GA_PERCENT_PARENTS_MATING = 60
+META_GA_PARENT_SELECTION_TYPE = "tournament"
+META_GA_K_TOURNAMENT = 2 # only effective when PARENT_SELECTION_TYPE equals 'tournament'
+META_GA_CROSSOVER_PROBABILITY = 0.9
+META_GA_CROSSOVER_TYPE = "uniform"
+META_GA_MUTATION_NUM_GENES = 1
+META_GA_MUTATION_TYPE = "random"
+META_GA_KEEP_ELITISM = 1
 
 # problem, algorithm and parameter names must match those from the niapy library
 OPTIMIZATION_PROBLEM = Rosenbrock(dimension=20)
 GENE_SPACES = {
-    "FireflyAlgorithm": {
+    "FireflyAlgorithm" : {
         "alpha": {"low": 0.0, "high": 1.1},
         "beta0": {"low": 0.0, "high": 1.1},
-        "gamma": {"low": 0.0, "high": 1.1},
+        "gamma": {"low": 0.0, "high": 0.001},
         "theta": {"low": 0.0, "high": 1.1},
     },
-    "ParticleSwarmAlgorithm": {
-        "c1": {"low": 0.0, "high": 3.0},
-        "c2": {"low": 0.0, "high": 3.0},
-        "w": {"low": 0.0, "high": 2.0},
-        "min_velocity": {"low": -10, "high": 0.0},
-        "max_velocity": {"low": 0.0, "high": 10.0},
+    "ParticleSwarmAlgorithm" : {
+        "c1": {"low": 0.0, "high": 2.0},
+        "c2": {"low": 0.0, "high": 2.0},
+        "w": {"low": 0.3, "high": 1.2},
+        "min_velocity": {"low": -10.0, "high": -10.0},
+        "max_velocity": {"low": 10.0, "high": 10.0},
     },
 }
