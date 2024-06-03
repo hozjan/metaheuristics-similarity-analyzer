@@ -91,6 +91,7 @@ def optimization_worker(
     rng_seed: int = None,
     run_index: int = None,
     keep_pop_data: bool = True,
+    keep_diversity_metrics: bool = True,
 ):
     r"""Single optimization run execution.
 
@@ -104,7 +105,8 @@ def optimization_worker(
         dataset_path (Optional[str]): Path to the dataset to be created.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
         run_index (Optional[int]): Run index, used for file name indexing. Has no effect if dataset_path is None.
-        keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space on data export. Does not clear population metrics. Has no effect if dataset_path is None.
+        keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space on data export. Does not clear diversity metrics. Has no effect if dataset_path is None.
+        keep_diversity_metrics (Optional[bool]): If false clear diversity metrics in order to further save space on data export. Has no effect if keep_pop_data is true (true by default).
     """
     task = Task(problem, max_iters=max_iters, max_evals=max_evals)
 
@@ -138,7 +140,7 @@ def optimization_worker(
         Path(path).mkdir(parents=True, exist_ok=True)
 
     single_run_data.export_to_json(
-        os.path.join(path, f"run_{run_index:05d}.json"), keep_pop_data=keep_pop_data
+        os.path.join(path, f"run_{run_index:05d}.json"), keep_pop_data=keep_pop_data, keep_diversity_metrics=keep_diversity_metrics
     )
 
     return single_run_data
@@ -154,7 +156,9 @@ def optimization_runner(
     max_iters: int = np.inf,
     max_evals: int = np.inf,
     rng_seed: int = None,
+    run_index_seed: bool = False,
     keep_pop_data: bool = True,
+    keep_diversity_metrics: bool = True,
     parallel_processing: bool = False,
 ):
     r"""Optimization work splitter.
@@ -168,13 +172,17 @@ def optimization_runner(
         indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
         max_iters (Optional[int]): Individual optimization run stopping condition.
         max_evals (Optional[int]): Individual optimization run stopping condition.
-        rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
-        keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space on data export. Does not clear population metrics.
+        rng_seed (Optional[int]): Seed for the rng, provide for reproducible results. Has no effect if run_index_seed is True.
+        run_index_seed (Optional[bool]): Use run index as rng_seed for increased but controlled randomization.
+        keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space on data export. Does not clear diversity metrics.
+        keep_diversity_metrics (Optional[bool]): If false clear diversity metrics in order to further save space on data export. Has no effect if keep_pop_data is true (true by default).
         parallel_processing (Optional[bool]): Execute optimization runs in parallel over multiple processes.
     """
     if parallel_processing:
         pool = []
         for r_idx in range(runs):
+            if run_index_seed:
+                rng_seed = r_idx
             p = multiprocessing.Process(
                 target=optimization_worker,
                 args=(
@@ -187,7 +195,8 @@ def optimization_runner(
                     dataset_path,
                     rng_seed,
                     r_idx,
-                    keep_pop_data
+                    keep_pop_data,
+                    keep_diversity_metrics
                 ),
             )
             p.start()
@@ -197,6 +206,8 @@ def optimization_runner(
             p.join()
     else:
         for r_idx in range(runs):
+            if run_index_seed:
+                rng_seed = r_idx
             optimization_worker(
                 problem=problem,
                 algorithm=algorithm,
@@ -207,5 +218,6 @@ def optimization_runner(
                 dataset_path=dataset_path,
                 rng_seed=rng_seed,
                 run_index=r_idx,
-                keep_pop_data=keep_pop_data
+                keep_pop_data=keep_pop_data,
+                keep_diversity_metrics=keep_diversity_metrics
             )
