@@ -115,6 +115,8 @@ class SingleRunData:
         self.max_evals = max_evals
         self.max_iters = max_iters
         self.populations = []
+        self.best_fitness = None
+        self.best_solution = None
         self.indiv_metrics = {}
         self.pop_metrics = {}
 
@@ -125,6 +127,8 @@ class SingleRunData:
             population (PopulationData): Population of type PopulationData.
         """
         self.populations.append(population_data)
+        self.best_fitness = population_data.best_fitness
+        self.best_solution = population_data.best_solution
 
     def get_pop_diversity_metrics_values(self, normalize=False):
         r"""Get population diversity metrics values.
@@ -271,17 +275,22 @@ class SingleRunData:
 
         return fitness_values
 
-    def export_to_json(self, filename, keep_pop_data=True):
+    def export_to_json(self, filename, keep_pop_data=True, keep_diversity_metrics=True):
         r"""Export to json file.
 
         Args:
             filename (str): Filename of the output file.
-            keep_pop_data (Optional[bool]): Clear population solutions and fitness values in order to save space. Does not clear population metrics.
+            keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space. Does not clear diversity metrics.
+            keep_diversity_metrics (Optional[bool]): If false clear diversity metrics to further save space. Has no effect if keep_pop_data is true (true by default).
         """
 
         if not keep_pop_data:
-            self.get_pop_diversity_metrics_values()
-            self.populations = None
+            if keep_diversity_metrics:
+                self.get_pop_diversity_metrics_values()
+            else:
+                self.indiv_metrics = {}
+                self.pop_metrics = {}
+            self.populations = []
 
         if self.algorithm_parameters is not None:
             for k, v in self.algorithm_parameters.items():
@@ -311,8 +320,10 @@ class SingleRunData:
         single_run.max_iters = data_dict["max_iters"]
         single_run.indiv_metrics = data_dict["indiv_metrics"]
         single_run.pop_metrics = data_dict["pop_metrics"]
+        single_run.best_fitness = data_dict["best_fitness"]
+        single_run.best_solution = data_dict["best_solution"]
         single_run.populations.clear()
-        if data_dict["populations"] is None:
+        if data_dict["populations"] is None or len(data_dict["populations"]) == 0:
             return single_run
         
         for pop in data_dict["populations"]:
