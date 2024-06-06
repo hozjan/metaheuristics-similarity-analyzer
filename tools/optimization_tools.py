@@ -20,8 +20,8 @@ def optimization(
     algorithm: Algorithm,
     task: Task,
     single_run_data: SingleRunData,
-    pop_diversity_metrics: list[PopDiversityMetric],
-    indiv_diversity_metrics: list[IndivDiversityMetric],
+    pop_diversity_metrics: list[PopDiversityMetric] = None,
+    indiv_diversity_metrics: list[IndivDiversityMetric] = None,
     rng_seed: int = None,
 ):
     r"""An adaptation of NiaPy Algorithm run method.
@@ -30,8 +30,8 @@ def optimization(
         algorithm (Algorithm): Algorithm.
         task (Task): Task with pre configured parameters.
         single_run_data (SingleRunData): Instance for archiving optimization results
-        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
-        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
+        pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics to calculate.
+        indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics to calculate.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
     """
     try:
@@ -55,10 +55,11 @@ def optimization(
                 best_solution=np.array(xb),
                 best_fitness=fxb * task.optimization_type.value,
             )
-            pop_data.calculate_metrics(
-                pop_diversity_metrics,
-                task.problem,
-            )
+            if not (pop_diversity_metrics is None):
+                pop_data.calculate_metrics(
+                    pop_diversity_metrics,
+                    task.problem,
+                )
             single_run_data.add_population(pop_data)
             algorithm.callbacks.before_iteration(pop, fpop, xb, fxb, **params)
             pop, fpop, xb, fxb, params = algorithm.run_iteration(
@@ -68,7 +69,8 @@ def optimization(
             algorithm.callbacks.after_iteration(pop, fpop, xb, fxb, **params)
             task.next_iter()
         algorithm.callbacks.after_run()
-        single_run_data.calculate_indiv_diversity_metrics(indiv_diversity_metrics)
+        if not (indiv_diversity_metrics is None):
+            single_run_data.calculate_indiv_diversity_metrics(indiv_diversity_metrics)
         return xb, fxb * task.optimization_type.value
     except BaseException as e:
         if (
@@ -83,8 +85,8 @@ def optimization(
 def optimization_worker(
     problem: Problem,
     algorithm: Algorithm,
-    pop_diversity_metrics: list[PopDiversityMetric],
-    indiv_diversity_metrics: list[IndivDiversityMetric],
+    pop_diversity_metrics: list[PopDiversityMetric] = None,
+    indiv_diversity_metrics: list[IndivDiversityMetric] = None,
     max_iters: int = np.inf,
     max_evals: int = np.inf,
     dataset_path: str = None,
@@ -98,8 +100,8 @@ def optimization_worker(
     Args:
         algorithm (Algorithm): Algorithm.
         problem (Problem): Optimization problem.
-        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
-        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
+        pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics to calculate.
+        indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics to calculate.
         max_iters (Optional[int]): Individual optimization run stopping condition.
         max_evals (Optional[int]): Individual optimization run stopping condition.
         dataset_path (Optional[str]): Path to the dataset to be created.
@@ -151,8 +153,8 @@ def optimization_runner(
     problem: Problem,
     runs: int,
     dataset_path: str,
-    pop_diversity_metrics: list[PopDiversityMetric],
-    indiv_diversity_metrics: list[IndivDiversityMetric],
+    pop_diversity_metrics: list[PopDiversityMetric] = None,
+    indiv_diversity_metrics: list[IndivDiversityMetric] = None,
     max_iters: int = np.inf,
     max_evals: int = np.inf,
     rng_seed: int = None,
@@ -168,8 +170,8 @@ def optimization_runner(
         problem (Problem): Optimization problem.
         runs (int): Number of runs to execute.
         dataset_path (str): Path to the dataset to be created.
-        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics to calculate.
-        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics to calculate.
+        pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics to calculate.
+        indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics to calculate.
         max_iters (Optional[int]): Individual optimization run stopping condition.
         max_evals (Optional[int]): Individual optimization run stopping condition.
         rng_seed (Optional[int]): Seed for the rng, provide for reproducible results. Has no effect if run_index_seed is True.
