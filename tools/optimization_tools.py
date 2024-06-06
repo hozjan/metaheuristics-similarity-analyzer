@@ -71,6 +71,7 @@ def optimization(
         algorithm.callbacks.after_run()
         if not (indiv_diversity_metrics is None):
             single_run_data.calculate_indiv_diversity_metrics(indiv_diversity_metrics)
+        single_run_data.evals = task.evals
         return xb, fxb * task.optimization_type.value
     except BaseException as e:
         if (

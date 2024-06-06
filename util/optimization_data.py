@@ -114,6 +114,7 @@ class SingleRunData:
         self.problem_name = problem_name
         self.max_evals = max_evals
         self.max_iters = max_iters
+        self.evals = 0
         self.populations = []
         self.best_fitness = None
         self.best_solution = None
@@ -318,6 +319,7 @@ class SingleRunData:
         single_run.problem_name = data_dict["problem_name"]
         single_run.max_evals = data_dict["max_evals"]
         single_run.max_iters = data_dict["max_iters"]
+        single_run.evals = data_dict["evals"]
         single_run.indiv_metrics = data_dict["indiv_metrics"]
         single_run.pop_metrics = data_dict["pop_metrics"]
         single_run.best_fitness = data_dict["best_fitness"]
