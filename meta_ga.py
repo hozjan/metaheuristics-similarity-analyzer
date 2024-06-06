@@ -13,6 +13,7 @@ import numpy as np
 import pygad
 from tools.optimization_tools import optimization_runner, optimization_worker
 from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTM
+from util.optimization_data import SingleRunData
 import shutil
 import logging
 import graphviz
@@ -531,6 +532,45 @@ def meta_ga_info(
     gv.render(format="png", cleanup=True)
 
 
+def meta_ga_fitness_function_for_parameter_tuning(meta_ga, solution, solution_idx):
+    r"""Fitness function of the meta genetic algorithm.
+    For tuning parameters of metaheuristic algorithms for best performance."""
+
+    _META_DATASET = os.path.join(META_GA_TMP_DATA, f"{solution_idx}_{META_DATASET}")
+
+    algorithms = solution_to_algorithm_attributes(solution, GENE_SPACES)
+
+    if isinstance(OPTIMIZATION_PROBLEM, Problem):
+        problem = OPTIMIZATION_PROBLEM
+    else:
+        problem = get_problem(OPTIMIZATION_PROBLEM)
+
+    # gather optimization data
+    for algorithm in algorithms:
+        optimization_runner(
+            algorithm=algorithm,
+            problem=problem,
+            runs=NUM_RUNS,
+            dataset_path=_META_DATASET,
+            max_iters=MAX_ITERS,
+            run_index_seed=True,
+            keep_pop_data=False,
+            keep_diversity_metrics=False,
+            parallel_processing=True,
+        )
+
+    fitness_values = []
+    for algorithm in os.listdir(_META_DATASET):
+        for problem in os.listdir(os.path.join(_META_DATASET, algorithm)):
+            runs = os.listdir(os.path.join(_META_DATASET, algorithm, problem))
+            for run in runs:
+                run_path = os.path.join(_META_DATASET, algorithm, problem, run)
+                fitness_values.append(SingleRunData.import_from_json(run_path).best_fitness)
+
+    avg_fitness = np.average(fitness_values)
+
+    return 1.0 / avg_fitness + 0.0000000001
+
 def meta_ga_fitness_function(meta_ga, solution, solution_idx):
     r"""Fitness function of the meta genetic algorithm."""
 
@@ -783,7 +823,7 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
         num_parents_mating=num_parents_mating,
         keep_elitism=META_GA_KEEP_ELITISM,
         allow_duplicate_genes=False,
-        fitness_func=meta_ga_fitness_function,
+        fitness_func=meta_ga_fitness_function_for_parameter_tuning,
         sol_per_pop=META_GA_SOLUTIONS_PER_POP,
         num_genes=len(combined_gene_space),
         parent_selection_type=META_GA_PARENT_SELECTION_TYPE,
@@ -799,6 +839,7 @@ def run_meta_ga(filename="meta_ga_obj", plot_filename="meta_ga_fitness_plot"):
         gene_space=combined_gene_space,
         on_generation=on_generation_progress,
         save_best_solutions=True,
+        save_solutions=True,
         stop_criteria="saturate_10",
         parallel_processing=["process", META_GA_SOLUTIONS_PER_POP],
         logger=get_logger(),
