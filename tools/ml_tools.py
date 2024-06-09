@@ -157,7 +157,7 @@ def nn_train(
     loss_fn,
     optimizer,
     device,
-    model_file_name,
+    model_filename,
     patience=np.inf,
     verbal=False,
 ):
@@ -226,7 +226,7 @@ def nn_train(
         if val_loss_values[-1] < best_loss:
             trial_counter = 0
             best_loss = val_loss_values[-1]
-            torch.save(model, model_file_name)
+            torch.save(model, model_filename)
             if verbal:
                 print(f"Saving model with loss: {best_loss :.10f}")
         else:
