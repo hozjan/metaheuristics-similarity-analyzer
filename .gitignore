@@ -1,14 +1,13 @@
 *
 !metaheuristics_similarity_analyzer.ipynb
-!meta_ga.py
 !util
 !util/optimization_data.py
 !util/pop_diversity_metrics.py
 !util/indiv_diversity_metrics.py
 !util/constants.py
 !tools
+!tools/meta_ga.py
 !tools/ml_tools.py
 !tools/optimization_tools.py
 !pyproject.toml
 !.gitignore
-
