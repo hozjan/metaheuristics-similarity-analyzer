@@ -145,9 +145,7 @@ class SingleRunData:
                 for metric in population.metrics_values:
                     if idx == 0:
                         self.pop_metrics[metric] = []
-                    self.pop_metrics[metric].append(
-                        population.metrics_values[metric]
-                    )
+                    self.pop_metrics[metric].append(population.metrics_values[metric])
 
         _pop_metrics = dict(self.pop_metrics)
 
@@ -178,46 +176,6 @@ class SingleRunData:
                 )
 
         return pd.DataFrame.from_dict(_indiv_metrics)
-
-    def diversity_metrics_euclidean_distance(
-        self, run: "SingleRunData", include_fitness_convergence=False, normalize=False
-    ):
-        r"""Calculate the sum of euclidean distances between corresponding diversity metrics of two individual runs.
-
-        Args:
-            run (SingleRunData): Single run data for comparison to the current instance.
-            include_fitness_convergence (bool): Also include euclidean distance of the fitness convergence.
-            normalize (bool): Method returns a sum of euclidean distances between normalized metrics if true.
-
-        Returns:
-            float: Sum of euclidean distances.
-        """
-        first_pdm = np.transpose(
-            self.get_pop_diversity_metrics_values(normalize).to_numpy(), (1, 0)
-        )
-        second_pdm = np.transpose(
-            run.get_pop_diversity_metrics_values(normalize).to_numpy(), (1, 0)
-        )
-
-        first_idm = self.get_indiv_diversity_metrics_values(normalize).to_numpy()
-        second_idm = run.get_indiv_diversity_metrics_values(normalize).to_numpy()
-
-        euclidean_sum = 0
-        for first, second in zip(first_pdm, second_pdm):
-            euclidean_sum += euclidean(first, second)
-
-        f_pca = PCA(n_components=first_idm.shape[1])
-        f_principal_components = f_pca.fit_transform(first_idm).flatten()
-        s_pca = PCA(n_components=second_idm.shape[1])
-        s_principal_components = s_pca.fit_transform(second_idm).flatten()
-        euclidean_sum += euclidean(f_principal_components, s_principal_components)
-
-        if include_fitness_convergence:
-            first_fitness = self.get_best_fitness_values(normalize)
-            second_fitness = run.get_best_fitness_values(normalize)
-            euclidean_sum += euclidean(first_fitness, second_fitness)
-
-        return euclidean_sum
 
     def calculate_indiv_diversity_metrics(self, metrics):
         r"""Calculate Individual diversity metrics.
@@ -327,7 +285,7 @@ class SingleRunData:
         single_run.populations.clear()
         if data_dict["populations"] is None or len(data_dict["populations"]) == 0:
             return single_run
-        
+
         for pop in data_dict["populations"]:
             pop_dict = json.loads(pop)
             pop_data = PopulationData(
