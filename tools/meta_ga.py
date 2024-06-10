@@ -432,7 +432,7 @@ class MetaGA:
             plot_filename (Optional[str]): Name of the fitness plot image file.
         """
 
-        self.__meta_ga_info(
+        self.meta_ga_info(
             filename=os.path.join(self.__archive_path, "meta_ga_info"),
         )
         self.__clean_tmp_data()
@@ -473,6 +473,7 @@ class MetaGA:
 
         self.__clean_tmp_data()
 
+        self.meta_ga.logger.handlers.clear()
         self.meta_ga.save(os.path.join(self.__archive_path, filename))
         self.meta_ga.plot_fitness(
             save_dir=os.path.join(self.__archive_path, f"{plot_filename}.png")
@@ -480,7 +481,7 @@ class MetaGA:
         best_solutions = self.meta_ga.best_solutions
         print(f"Best solution: {best_solutions[-1]}")
 
-    def __meta_ga_info(
+    def meta_ga_info(
         self,
         filename: str = "meta_ga_info",
         table_background_color: str = "white",
