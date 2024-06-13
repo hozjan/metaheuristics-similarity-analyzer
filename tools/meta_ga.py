@@ -50,9 +50,10 @@ class MetaGA:
         ga_keep_elitism: int,
         gene_spaces: dict[str, dict[str, Any]],
         pop_size: int,
-        max_iters: int,
-        num_runs: int,
-        problem: Problem | str,
+        max_iters: int = np.inf,
+        max_evals: int = np.inf,
+        num_runs: int = 10,
+        problem: Problem | str = "Sphere",
         pop_diversity_metrics: list[PopDiversityMetric] = None,
         indiv_diversity_metrics: list[IndivDiversityMetric] = None,
         n_pca_components: int = 3,
@@ -81,9 +82,10 @@ class MetaGA:
             ga_keep_elitism (int): Number of solutions that are a part of the elitism of the genetic algorithm.
             gene_spaces (dict[str, dict[str, Any]]): Gene spaces of the solution.
             pop_size (int): Population size of the metaheuristics being optimized.
-            max_iters (int): Maximum number of iterations of the metaheuristic being optimized for each solution of the genetic algorithm.
-            num_runs (int): Number of runs performed by the metaheuristic being optimized for each solution of the genetic algorithm.
-            problem (Problem | str): Optimization problem use.
+            max_iters (Optional[int]): Maximum number of iterations of the metaheuristic being optimized for each solution of the genetic algorithm.
+            max_evals (Optional[int]): Maximum number of evaluations of the metaheuristic being optimized for each solution of the genetic algorithm.
+            num_runs (Optional[int]): Number of runs performed by the metaheuristic being optimized for each solution of the genetic algorithm.
+            problem (Optional[Problem | str]): Optimization problem use.
             pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics calculated. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
             indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics calculated. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
             n_pca_components (Optional[int]): Number of PCA components to use per learning sample of the neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
@@ -103,6 +105,11 @@ class MetaGA:
                 "Diversity metrics must be defined when fitness_function_type set to `PERFORMANCE_SIMILARITY`."
             )
 
+        if max_evals == np.inf and max_iters == np.inf:
+            raise ValueError(
+                "Defining a finite value for max_evals and/or max_iters is required."
+            )
+
         self.fitness_function_type = fitness_function_type
         self.gene_spaces = gene_spaces
         self.problem = problem
@@ -118,6 +125,7 @@ class MetaGA:
         self.ga_keep_elitism = ga_keep_elitism
         self.pop_size = pop_size
         self.max_iters = max_iters
+        self.max_evals = max_evals
         self.num_runs = num_runs
         self.pop_diversity_metrics = pop_diversity_metrics
         self.indiv_diversity_metrics = indiv_diversity_metrics
@@ -323,6 +331,7 @@ class MetaGA:
                 runs=self.num_runs,
                 dataset_path=meta_dataset,
                 max_iters=self.max_iters,
+                max_evals=self.max_evals,
                 run_index_seed=True,
                 keep_pop_data=False,
                 keep_diversity_metrics=False,
@@ -371,6 +380,7 @@ class MetaGA:
                 pop_diversity_metrics=self.pop_diversity_metrics,
                 indiv_diversity_metrics=self.indiv_diversity_metrics,
                 max_iters=self.max_iters,
+                max_evals=self.max_evals,
                 rng_seed=self.rng_seed,
                 keep_pop_data=False,
                 parallel_processing=True,
