@@ -15,6 +15,7 @@ from util.pop_diversity_metrics import (
     PMD,
     AAD,
     PDI,
+    FDC,
     PFSD,
     PFMea,
     PFMed,
@@ -85,6 +86,8 @@ class PopulationData:
                     self.metrics_values[metric.value] = PFMea(self.population_fitness)
                 case PopDiversityMetric.PFMed:
                     self.metrics_values[metric.value] = PFMed(self.population_fitness)
+                case PopDiversityMetric.FDC:
+                    self.metrics_values[metric.value] = FDC(self.population, self.population_fitness, problem)
 
 
 class SingleRunData:
@@ -131,14 +134,15 @@ class SingleRunData:
         self.best_fitness = population_data.best_fitness
         self.best_solution = population_data.best_solution
 
-    def get_pop_diversity_metrics_values(self, normalize=False):
+    def get_pop_diversity_metrics_values(self, metrics:list[PopDiversityMetric]=None, normalize=False):
         r"""Get population diversity metrics values.
 
         Args:
-            normalize (bool): method returns normalized values if true.
+            metrics (List[DiversityMetric]): List of metrics to return. Returns all metrics if None (by default).
+            normalize (Optional[bool]): Method returns normalized values if true.
 
         Returns:
-            pandas.DataFrame: metrics values throughout the run
+            pandas.DataFrame: Metrics values throughout the run
         """
         if len(self.pop_metrics.keys()) == 0:
             for idx, population in enumerate(self.populations):
@@ -147,9 +151,16 @@ class SingleRunData:
                         self.pop_metrics[metric] = []
                     self.pop_metrics[metric].append(population.metrics_values[metric])
 
-        _pop_metrics = dict(self.pop_metrics)
+        if not (metrics is None):
+            _pop_metrics = {}
+            for metric in metrics:
+                if metric.value in self.pop_metrics:
+                    _pop_metrics[metric.value] = self.pop_metrics.get(metric.value)
+        else:
+            _pop_metrics = dict(self.pop_metrics)
 
-        if normalize:
+
+        if normalize and len(_pop_metrics) != 0:
             for metric in _pop_metrics:
                 _pop_metrics[metric][-1] = 0.0
                 _pop_metrics[metric] = sklearn.preprocessing.minmax_scale(
@@ -162,10 +173,10 @@ class SingleRunData:
         r"""Get individual diversity metrics values.
 
         Args:
-            normalize (bool): method returns normalized values if true.
+            normalize (Optional[bool]): Method returns normalized values if true.
 
         Returns:
-            pandas.DataFrame: metrics values throughout the run
+            pandas.DataFrame: Metrics values throughout the run
         """
         _indiv_metrics = dict(self.indiv_metrics)
 
@@ -221,7 +232,7 @@ class SingleRunData:
         r"""Get array of best fitness values of all populations through the run.
 
         Returns:
-            numpy.ndarray: best fitness values throughout the run
+            numpy.ndarray: Best fitness values throughout the run
         """
         fitness_values = np.array([])
         for p in self.populations:
