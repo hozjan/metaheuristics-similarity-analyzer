@@ -4,7 +4,7 @@ from enum import Enum
 from niapy.problems import Problem
 from niapy.util.distances import euclidean
 
-__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "PFSD", "PFMea", "PFMed"]
+__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFMea", "PFMed"]
 
 
 class PopDiversityMetric(Enum):
@@ -13,6 +13,7 @@ class PopDiversityMetric(Enum):
     PMD = "pmd"
     AAD = "aad"
     PDI = "pdi"
+    FDC = "fdc"
     PFSD = "pfsd"
     PFMea = "pfmea"
     PFMed = "pfmed"
@@ -164,6 +165,34 @@ def PDI(population, problem: Problem, epsilon=0.001):
         sum += math.log(math.pow(p_hat, sigma))
 
     return -sum / (m * math.log(m))
+
+
+def FDC(population, population_fitness, problem: Problem):
+    r"""Fitness Distance Correlation.
+
+    Args:
+        population (numpy.ndarray): population.
+        population_fitness (numpy.ndarray): population fitness.
+        problem (Problem): Optimization problem.
+
+    Returns:
+        FDC value.
+    """
+    P, N = np.shape(population)
+    D = np.array([])
+    for xi in population:
+        D = np.append(D, euclidean(xi, problem.global_optimum))
+
+    f_avg = population_fitness.mean()
+    f_std = population_fitness.std()
+    d_avg = D.mean()
+    d_std = D.std()
+
+    CFD = 0
+    for fi, di in zip(population_fitness, D):
+        CFD += (fi - f_avg) * (di - d_avg) / P
+
+    return CFD / f_std * d_std
 
 
 def PFSD(population_fitness):
