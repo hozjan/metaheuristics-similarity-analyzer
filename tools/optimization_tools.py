@@ -47,11 +47,14 @@ def optimization(
             algorithm.rng = default_rng()
 
         xb, fxb = algorithm.get_best(pop, fpop)
+
+        sorted_idx = np.array([*range(algorithm.population_size)])
+
         while not task.stopping_condition():
             # save population data
             pop_data = PopulationData(
-                population=np.array(pop),
-                population_fitness=np.array(fpop),
+                population=np.array(pop[sorted_idx]),
+                population_fitness=np.array(fpop[sorted_idx]),
                 best_solution=np.array(xb),
                 best_fitness=fxb * task.optimization_type.value,
             )
@@ -65,6 +68,9 @@ def optimization(
             pop, fpop, xb, fxb, params = algorithm.run_iteration(
                 task, pop, fpop, xb, fxb, **params
             )
+
+            if "sorted_idx" in params:
+                sorted_idx = sorted_idx[params.get("sorted_idx")]
 
             algorithm.callbacks.after_iteration(pop, fpop, xb, fxb, **params)
             task.next_iter()
