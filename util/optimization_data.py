@@ -87,7 +87,9 @@ class PopulationData:
                 case PopDiversityMetric.PFMed:
                     self.metrics_values[metric.value] = PFMed(self.population_fitness)
                 case PopDiversityMetric.FDC:
-                    self.metrics_values[metric.value] = FDC(self.population, self.population_fitness, problem)
+                    self.metrics_values[metric.value] = FDC(
+                        self.population, self.population_fitness, problem
+                    )
 
 
 class SingleRunData:
@@ -134,7 +136,9 @@ class SingleRunData:
         self.best_fitness = population_data.best_fitness
         self.best_solution = population_data.best_solution
 
-    def get_pop_diversity_metrics_values(self, metrics:list[PopDiversityMetric]=None, normalize=False):
+    def get_pop_diversity_metrics_values(
+        self, metrics: list[PopDiversityMetric] = None, normalize=False
+    ):
         r"""Get population diversity metrics values.
 
         Args:
@@ -159,10 +163,8 @@ class SingleRunData:
         else:
             _pop_metrics = dict(self.pop_metrics)
 
-
         if normalize and len(_pop_metrics) != 0:
             for metric in _pop_metrics:
-                _pop_metrics[metric][-1] = 0.0
                 _pop_metrics[metric] = sklearn.preprocessing.minmax_scale(
                     _pop_metrics[metric], feature_range=(0, 1)
                 )
@@ -187,6 +189,26 @@ class SingleRunData:
                 )
 
         return pd.DataFrame.from_dict(_indiv_metrics)
+
+    def get_combined_feature_vector(self):
+        r"""Calculate feature vector composed of PCA eigenvectors and eigenvalues of diversity metrics.
+
+        Returns:
+            features (numpy.ndarray[float]): Vector of combined PCA eigenvectors and eigenvalues of diversity metrics.
+        """
+        indiv_metrics = self.get_indiv_diversity_metrics_values(normalize=False)
+        pop_metrics = self.get_pop_diversity_metrics_values(normalize=False)
+        pca_indiv = PCA()
+        pca_indiv.fit(indiv_metrics)
+        indiv_components = pca_indiv.components_.flatten()
+        indiv_variance = pca_indiv.explained_variance_ratio_
+        pca_pop = PCA()
+        pca_pop.fit(pop_metrics)
+        pop_components = pca_pop.components_.flatten()
+        pop_variance = pca_pop.explained_variance_ratio_
+        return np.concatenate(
+            (indiv_components, indiv_variance, pop_components, pop_variance)
+        )
 
     def calculate_indiv_diversity_metrics(self, metrics):
         r"""Calculate Individual diversity metrics.
@@ -269,7 +291,6 @@ class SingleRunData:
 
         json_object = json.dumps(self.__dict__, indent=4, cls=JsonEncoder)
 
-        # Writing to sample.json
         with open(filename, "w") as outfile:
             outfile.write(json_object)
 
