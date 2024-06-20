@@ -178,6 +178,9 @@ def FDC(population, population_fitness, problem: Problem):
     Returns:
         FDC value.
     """
+    if problem.global_optimum is None:
+        return 0.0
+
     P, N = np.shape(population)
     D = np.array([])
     for xi in population:
