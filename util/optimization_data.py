@@ -271,7 +271,7 @@ class SingleRunData:
         r"""Export to json file.
 
         Args:
-            filename (str): Filename of the output file.
+            filename (str): Filename of the output file. File extension .json has to be included.
             keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space. Does not clear diversity metrics.
             keep_diversity_metrics (Optional[bool]): If false clear diversity metrics to further save space. Has no effect if keep_pop_data is true (true by default).
         """
@@ -299,11 +299,17 @@ class SingleRunData:
         r"""Import data from the json file and create new class instance.
 
         Args:
-            filename (str): Filename of the input file.
+            filename (str): Filename of the input file. File extension .json has to be included.
         """
+        try:
+            with open(filename) as file:
+                data_dict = json.load(file)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File {filename}.json not found.")
+        except:
+            raise BaseException(f"File {filename}.json could not be loaded.")
+        
         single_run = SingleRunData()
-        file = open(filename)
-        data_dict = json.load(file)
         single_run.algorithm_name = data_dict["algorithm_name"]
         single_run.algorithm_parameters = data_dict["algorithm_parameters"]
         single_run.problem_name = data_dict["problem_name"]
