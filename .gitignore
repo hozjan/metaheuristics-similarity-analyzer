@@ -9,5 +9,6 @@
 !tools/meta_ga.py
 !tools/ml_tools.py
 !tools/optimization_tools.py
+!tools/metaheuristic_similarity_analyzer.py
 !pyproject.toml
 !.gitignore
