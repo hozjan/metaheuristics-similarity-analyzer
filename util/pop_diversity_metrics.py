@@ -3,6 +3,7 @@ import math
 from enum import Enum
 from niapy.problems import Problem
 from niapy.util.distances import euclidean
+import itertools
 
 __all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFMea", "PFMed"]
 
@@ -34,22 +35,15 @@ def PDC(population, problem: Problem):
 
     """
     P, N = np.shape(population)
-    L = 0
 
-    for lb, ub in zip(problem.lower, problem.upper):
-        L += math.pow(ub - lb, 2)
-    L = math.sqrt(L)
+    L = euclidean(problem.upper, problem.lower)
 
-    avg_point = np.zeros(N)
-    for p in population:
-        for j, x in enumerate(p):
-            avg_point[j] += x
+    avg_point = np.mean(population, axis=0)
 
-    avg_point /= P
-
-    pdc = 0
-    for p in population:
-        pdc += euclidean(p, avg_point)
+    distances = np.linalg.norm(
+        population - list(itertools.repeat(avg_point, P)), axis=1
+    )
+    pdc = np.sum(distances, axis=0)
 
     return pdc / (P * L)
 
@@ -170,6 +164,9 @@ def PDI(population, problem: Problem, epsilon=0.001):
 def FDC(population, population_fitness, problem: Problem):
     r"""Fitness Distance Correlation.
 
+    Reference paper:
+        Jones, T.C. & Forrest, S. (1995). Fitness Distance Correlation as a Measure of Problem Difficulty for Genetic Algorithms.
+
     Args:
         population (numpy.ndarray): population.
         population_fitness (numpy.ndarray): population fitness.
@@ -182,20 +179,22 @@ def FDC(population, population_fitness, problem: Problem):
         return 0.0
 
     P, N = np.shape(population)
-    D = np.array([])
-    for xi in population:
-        D = np.append(D, euclidean(xi, problem.global_optimum))
-
+    D = np.linalg.norm(
+        population - list(itertools.repeat(problem.global_optimum, P)), axis=1
+    )
     f_avg = population_fitness.mean()
     f_std = population_fitness.std()
     d_avg = D.mean()
     d_std = D.std()
 
-    CFD = 0
-    for fi, di in zip(population_fitness, D):
-        CFD += (fi - f_avg) * (di - d_avg) / P
+    CFD = sum((population_fitness - f_avg) * (D - d_avg) / P)
 
-    return CFD / f_std * d_std
+    if f_std != 0.0 and d_std != 0:
+        FDC = CFD / (f_std * d_std)
+    else:
+        FDC = 0.0
+
+    return FDC
 
 
 def PFSD(population_fitness):

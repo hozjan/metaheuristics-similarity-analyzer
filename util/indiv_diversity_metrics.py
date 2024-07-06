@@ -26,12 +26,13 @@ def IDT(populations, pop_size):
         numpy.ndarray: Array of IDT values.
 
     """
-    distances = np.zeros(pop_size)
+    distances = []
     for t in range(len(populations) - 1):
-        for p in range(pop_size):
-            distances[p] += euclidean(
-                populations[t].population[p], populations[t + 1].population[p]
-            )
+        first = np.array([pop for pop in populations[t].population])
+        second = np.array([pop for pop in populations[t + 1].population])
+        distances.append(np.linalg.norm(first - second, axis = 1))
+    
+    distances = np.sum(distances, axis=0)
 
     return distances
 
