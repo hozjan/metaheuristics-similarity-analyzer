@@ -48,8 +48,9 @@ def optimization(
 
         xb, fxb = algorithm.get_best(pop, fpop)
 
-        sorted_idx = np.array([*range(algorithm.population_size)])
-
+        order_idx = np.array([*range(algorithm.population_size)])
+        sorted_idx = order_idx.copy()
+        
         while not task.stopping_condition():
             # save population data
             pop_data = PopulationData(
@@ -70,7 +71,8 @@ def optimization(
             )
 
             if "sorted_idx" in params:
-                sorted_idx = sorted_idx[params.get("sorted_idx")]
+                order_idx = order_idx[params.get("sorted_idx")]
+                sorted_idx = np.argsort(order_idx)
 
             algorithm.callbacks.after_iteration(pop, fpop, xb, fxb, **params)
             task.next_iter()
@@ -112,7 +114,7 @@ def optimization_worker(
         max_iters (Optional[int]): Individual optimization run stopping condition.
         max_evals (Optional[int]): Individual optimization run stopping condition.
         dataset_path (Optional[str]): Path to the dataset to be created.
-        rng_seed (Optional[int]): Seed for the rng, provide for reproducible results.
+        rng_seed (Optional[int]): Seed for the random generator, provide for reproducible results.
         run_index (Optional[int]): Run index, used for file name indexing. Has no effect if dataset_path is None.
         keep_pop_data (Optional[bool]): If false clear population solutions and fitness values in order to save space on data export. Does not clear diversity metrics. Has no effect if dataset_path is None.
         keep_diversity_metrics (Optional[bool]): If false clear diversity metrics in order to further save space on data export. Has no effect if keep_pop_data is true (true by default).
@@ -125,6 +127,7 @@ def optimization_worker(
         problem_name=problem.name(),
         max_iters=max_iters,
         max_evals=max_evals,
+        rng_seed=rng_seed,
     )
 
     optimization(
