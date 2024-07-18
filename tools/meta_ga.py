@@ -15,7 +15,7 @@ from torch import nn
 import numpy as np
 import pygad
 from tools.optimization_tools import optimization_runner
-from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTM
+from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTMClassifier
 from util.optimization_data import SingleRunData
 import shutil
 import logging
@@ -100,7 +100,7 @@ class MetaGA:
             test_size (Optional[float]): Size of the dataset used as test during testing of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
             batch_size (Optional[int]): Size of the batch used during training of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
             epochs (Optional[int]): Number of epochs performed during training of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            rng_seed (Optional[int]): Random seed of the random generator. Provide for reproducible results. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            rng_seed (Optional[int]): Seed of the random generator. Provide for reproducible results. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
             base_archive_path (Optional[str]): Base archive path of the meta genetic algorithm.
         """
         if (
@@ -486,11 +486,10 @@ class MetaGA:
                         ).get_combined_feature_vector()
                     )
 
-        cosine_distances = []
-        for fv1, fv2 in zip(target_feature_vectors, optimized_feature_vectors):
-            cosine_distances.append(1 - spatial.distance.cosine(fv1, fv2))
+        ofv_mean = np.mean(optimized_feature_vectors, axis=0)
+        tfv_mean = np.mean(target_feature_vectors, axis=0)
 
-        return np.average(cosine_distances)
+        return 1 - spatial.distance.cosine(ofv_mean, tfv_mean)
 
     def meta_ga_fitness_function_for_performance_similarity(
         self, meta_ga, solution, solution_idx
@@ -538,7 +537,7 @@ class MetaGA:
 
         # model parameters
         pop_features, indiv_features, _ = next(iter(train_data_loader))
-        model = LSTM(
+        model = LSTMClassifier(
             input_dim=np.shape(pop_features)[2],
             aux_input_dim=np.shape(indiv_features)[1],
             num_labels=len(labels),
