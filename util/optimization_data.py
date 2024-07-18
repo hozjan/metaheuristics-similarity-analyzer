@@ -102,8 +102,9 @@ class SingleRunData:
         algorithm_name: str = None,
         algorithm_parameters: Dict[str, Any] = None,
         problem_name: str = None,
-        max_evals=None,
-        max_iters=None,
+        max_evals: int = np.inf,
+        max_iters: int = np.inf,
+        rng_seed: int = None,
     ):
         r"""Archive the optimization data through iterations.
 
@@ -113,12 +114,14 @@ class SingleRunData:
             problem_name (Optional[str]): Problem name.
             max_evals (Optional[int]): Number of function evaluations.
             max_iters (Optional[int]): Number of generations or iterations.
+            rng_seed (Optional[int]): Seed of the random generator used for optimization.
         """
         self.algorithm_name = algorithm_name
         self.algorithm_parameters = algorithm_parameters
         self.problem_name = problem_name
         self.max_evals = max_evals
         self.max_iters = max_iters
+        self.rng_seed = rng_seed
         self.evals = 0
         self.populations = []
         self.best_fitness = None
@@ -206,6 +209,7 @@ class SingleRunData:
         pca_pop.fit(pop_metrics)
         pop_components = pca_pop.components_.flatten()
         pop_variance = pca_pop.explained_variance_ratio_
+        
         return np.concatenate(
             (indiv_components, indiv_variance, pop_components, pop_variance)
         )
@@ -315,6 +319,7 @@ class SingleRunData:
         single_run.problem_name = data_dict["problem_name"]
         single_run.max_evals = data_dict["max_evals"]
         single_run.max_iters = data_dict["max_iters"]
+        single_run.rng_seed = data_dict["rng_seed"]
         single_run.evals = data_dict["evals"]
         single_run.indiv_metrics = data_dict["indiv_metrics"]
         single_run.pop_metrics = data_dict["pop_metrics"]
