@@ -5,6 +5,7 @@
 !util/pop_diversity_metrics.py
 !util/indiv_diversity_metrics.py
 !util/constants.py
+!util/random.py
 !tools
 !tools/meta_ga.py
 !tools/ml_tools.py
