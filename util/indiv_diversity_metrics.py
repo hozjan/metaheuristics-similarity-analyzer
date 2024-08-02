@@ -1,11 +1,13 @@
 import numpy as np
-import math
+import scipy
 from enum import Enum
 from niapy.util.distances import euclidean
 import copy
 
+import scipy.stats
 
-__all__ = ["IDT", "ISI", "IFMea", "IFMed"]
+
+__all__ = ["IDT", "ISI", "IFMea", "IFMed", "IFIQR"]
 
 
 class IndivDiversityMetric(Enum):
@@ -13,6 +15,7 @@ class IndivDiversityMetric(Enum):
     ISI = "isi"
     IFMea = "ifmea"
     IFMed = "ifmed"
+    IFIQR = "ifiqr"
 
 
 def IDT(populations, pop_size):
@@ -30,8 +33,8 @@ def IDT(populations, pop_size):
     for t in range(len(populations) - 1):
         first = np.array([pop for pop in populations[t].population])
         second = np.array([pop for pop in populations[t + 1].population])
-        distances.append(np.linalg.norm(first - second, axis = 1))
-    
+        distances.append(np.linalg.norm(first - second, axis=1))
+
     distances = np.sum(distances, axis=0)
 
     return distances
@@ -95,3 +98,19 @@ def IFMed(populations):
         fitness_values.append(populations[t].population_fitness)
 
     return np.median(fitness_values, axis=0)
+
+
+def IFIQR(populations):
+    r"""Individual Fitness Interquartile Range.
+
+    Args:
+        populations (numpy.ndarray[PopulationData]): Populations.
+
+    Returns:
+        numpy.ndarray: Array of IFIQR values.
+    """
+    fitness_values = []
+    for t in range(len(populations) - 1):
+        fitness_values.append(populations[t].population_fitness)
+
+    return scipy.stats.iqr(fitness_values, axis=0)
