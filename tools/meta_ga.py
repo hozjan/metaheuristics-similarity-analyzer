@@ -51,7 +51,7 @@ class MetaGA:
         ga_crossover_probability: float,
         ga_mutation_num_genes: int,
         ga_keep_elitism: int,
-        gene_spaces: dict[str, dict[str, Any]],
+        gene_spaces: dict[str | Algorithm, dict[str, Any]],
         pop_size: int,
         max_iters: int = np.inf,
         max_evals: int = np.inf,
@@ -84,7 +84,7 @@ class MetaGA:
             ga_crossover_probability (float): Crossover probability of the genetic algorithm [0,1].
             ga_mutation_num_genes (int): Number of genes mutated in the solution of the genetic algorithm.
             ga_keep_elitism (int): Number of solutions that are a part of the elitism of the genetic algorithm.
-            gene_spaces (dict[str, dict[str, Any]]): Gene spaces of the solution.
+            gene_spaces (dict[str | Algorithm, dict[str, Any]]): Gene spaces of the solution.
             pop_size (int): Population size of the metaheuristics being optimized.
             max_iters (Optional[int]): Maximum number of iterations of the metaheuristic being optimized for each solution of the genetic algorithm.
             max_evals (Optional[int]): Maximum number of evaluations of the metaheuristic being optimized for each solution of the genetic algorithm.
@@ -171,11 +171,14 @@ class MetaGA:
         # check if all values in the provided gene spaces are correct and
         # assemble combined gene space for meta GA
         for alg_name in self.gene_spaces:
-            if alg_name not in _algorithm_options():
+            if not isinstance(alg_name, str) and issubclass(alg_name, Algorithm):
+                algorithm = alg_name()
+            elif alg_name not in _algorithm_options():
                 raise KeyError(
                     f"Could not find algorithm by name `{alg_name}` in the niapy library."
                 )
-            algorithm = get_algorithm(alg_name)
+            else:
+                algorithm = get_algorithm(alg_name)
             self.__algorithms.append(algorithm.Name[1])
             for setting in self.gene_spaces[alg_name]:
                 if type(setting) is tuple:
@@ -249,18 +252,14 @@ class MetaGA:
         if not isinstance(self.problem, Problem):
             self.problem = get_problem(self.problem)
 
-    def __create_folder_structure(self, prefix:str=None):
+    def __create_folder_structure(self, prefix: str = None):
         r"""Create folder structure for the meta genetic algorithm.
-        
+
         Args:
             prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current datetime by default.
         """
         if prefix is None:
-            prefix = str(
-                datetime.now().strftime(
-                    f"%m-%d_%H.%M.%S"
-                )
-            )
+            prefix = str(datetime.now().strftime(f"%m-%d_%H.%M.%S"))
         self.__archive_path = os.path.join(
             self.base_archive_path,
             "_".join([prefix, *self.__algorithms, self.problem.name()]),
@@ -301,14 +300,16 @@ class MetaGA:
 
     @staticmethod
     def solution_to_algorithm_attributes(
-        solution: list[float], gene_spaces: dict[str, dict[str, Any]], pop_size: int
+        solution: list[float],
+        gene_spaces: dict[str | Algorithm, dict[str, Any]],
+        pop_size: int,
     ):
         r"""Apply meta genetic algorithm solution to an corresponding algorithms based on the gene spaces used for the meta optimization.
         Make sure the solution matches the gene space.
 
         Args:
             solution (list[float]): Meta genetic algorithm solution.
-            gene_spaces (dict[str, dict[str, Any]]): Gene spaces of the solution.
+            gene_spaces (dict[str | Algorithm, dict[str, Any]]): Gene spaces of the solution.
             pop_size (int): Population size of the algorithms returned.
 
         Returns:
@@ -325,11 +326,15 @@ class MetaGA:
         solution_iter = 0
         algorithms = []
         for alg_name in gene_spaces:
-            if alg_name not in _algorithm_options():
+            if not isinstance(alg_name, str) and issubclass(alg_name, Algorithm):
+                algorithm = alg_name(population_size=pop_size)
+            elif alg_name not in _algorithm_options():
                 raise KeyError(
                     f"Could not find algorithm by name `{alg_name}` in the niapy library."
                 )
-            algorithm = get_algorithm(alg_name, population_size=pop_size)
+            else:
+                algorithm = get_algorithm(alg_name, population_size=pop_size)
+
             for setting in gene_spaces[alg_name]:
                 if type(setting) is tuple:
                     for sub_setting in setting:
@@ -650,7 +655,6 @@ class MetaGA:
             on_generation=self.on_generation_progress,
             save_best_solutions=True,
             save_solutions=True,
-            parallel_processing=["process", self.ga_solutions_per_pop],
             logger=self.__get_logger(
                 filename=os.path.join(self.__archive_path, "meta_ga_log_file")
             ),
@@ -772,7 +776,12 @@ class MetaGA:
                     margin="0",
                 )
                 combined_gene_space_len = 0
-                for alg_idx, alg_name in enumerate(list(self.gene_spaces.keys())):
+                for alg_idx, algorithm in enumerate(list(self.gene_spaces.keys())):
+                    if not isinstance(algorithm, str) and issubclass(algorithm, Algorithm):
+                        alg_name = algorithm.Name[0]
+                    elif isinstance(algorithm, str):
+                        alg_name = algorithm
+                    
                     node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
                         <tr>
                             <td colspan="2"><b>{alg_name}</b></td>
@@ -781,10 +790,10 @@ class MetaGA:
                             <td>pop size</td>
                             <td>{self.pop_size}</td>
                         </tr>"""
-                    for setting in self.gene_spaces[alg_name]:
+                    for setting in self.gene_spaces[algorithm]:
                         gene = ", ".join(
                             str(value)
-                            for value in self.gene_spaces[alg_name][setting].values()
+                            for value in self.gene_spaces[algorithm][setting].values()
                         )
                         combined_gene_space_len += 1
                         node_label += f"<tr><td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td></tr>"
@@ -1160,7 +1169,12 @@ class MetaGA:
                 " model accuracy\non test dataset"
                 if self.fitness_function_type
                 == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
-                else "average fitness \nof runs"
+                else (
+                    "average fitness \nof runs"
+                    if self.fitness_function_type
+                    == MetaGAFitnessFunction.PARAMETER_TUNING
+                    else "cosine distance \nof average feature vectors\nof target and optimized algorithm"
+                )
             ),
             ltail=(
                 "cluster_2"
