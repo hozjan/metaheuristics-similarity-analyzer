@@ -9,6 +9,8 @@ from niapy.problems.trid import Trid
 from niapy.problems.zakharov import Zakharov
 from niapy.problems.alpine import Alpine1
 from niapy.problems.griewank import Griewank
+from tools.algorithms.fa import FireflyAlgorithm
+from tools.algorithms.pso import ParticleSwarmAlgorithm
 import numpy as np
 
 
@@ -33,7 +35,7 @@ INDIV_DIVERSITY_METRICS = [
     IndivDiversityMetric.IDT,
     IndivDiversityMetric.ISI,
     IndivDiversityMetric.IFMea,
-    IndivDiversityMetric.IFMed,
+    IndivDiversityMetric.IFIQR,
 ]
 
 
@@ -53,14 +55,14 @@ TEST_SIZE = 0.2
 """
 Metaheuristic similarity analyzer parameters
 """
-NUM_COMPARISONS = 1
+NUM_COMPARISONS = 5
 
 
 """
 Meta GA parameters
 """
-META_GA_GENERATIONS = 20
-META_GA_SOLUTIONS_PER_POP = 20
+META_GA_GENERATIONS = 40
+META_GA_SOLUTIONS_PER_POP = 30
 META_GA_PERCENT_PARENTS_MATING = 60
 META_GA_PARENT_SELECTION_TYPE = "tournament"
 META_GA_K_TOURNAMENT = 2
@@ -73,18 +75,19 @@ META_GA_KEEP_ELITISM = 1
 # problem, algorithm and parameter names must match those from the niapy library
 OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
 GENE_SPACES = {
-    "FireflyAlgorithm": {
-        "alpha": {"low": 0.1, "high": 1.0},
-        "beta0": {"low": 0.0, "high": 1.0},
-        "gamma": {"low": 0.0, "high": 0.01},
-        "theta": {"low": 0.97, "high": 1.0},
+    FireflyAlgorithm: {
+        "alpha": {"low": 0.01, "high": 1.0, "step": 0.02},
+        "beta0": {"low": 0.01, "high": 1.0, "step": 0.02},
+        "gamma": {"low": 0.0, "high": 1.0, "step": 0.001},
+        "theta": {"low": 0.95, "high": 1.0, "step": 0.001},
     },
 }
 
+
 TARGET_GENE_SPACES = {
     "ParticleSwarmAlgorithm": {
-        "c1": {"low": 0.0, "high": 2.5},
-        "c2": {"low": 0.0, "high": 2.5},
-        "w": {"low": 0.0, "high": 1.1},
+        "c1": {"low": 0.01, "high": 2.5, "step": 0.01},
+        "c2": {"low": 0.01, "high": 2.5, "step": 0.01},
+        "w": {"low": 0.0, "high": 1.0, "step": 0.01},
     }
 }
