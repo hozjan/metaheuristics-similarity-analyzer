@@ -21,7 +21,14 @@ from util.pop_diversity_metrics import (
     PFMed,
     PopDiversityMetric,
 )
-from util.indiv_diversity_metrics import IDT, ISI, IFMea, IFMed, IndivDiversityMetric
+from util.indiv_diversity_metrics import (
+    IDT,
+    ISI,
+    IFMea,
+    IFMed,
+    IFIQR,
+    IndivDiversityMetric,
+)
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -209,9 +216,11 @@ class SingleRunData:
         pca_pop.fit(pop_metrics)
         pop_components = pca_pop.components_.flatten()
         pop_variance = pca_pop.explained_variance_ratio_
-        
-        return np.concatenate(
-            (indiv_components, indiv_variance, pop_components, pop_variance)
+
+        return np.nan_to_num(
+            np.concatenate(
+                (indiv_components, indiv_variance, pop_components, pop_variance)
+            )
         )
 
     def calculate_indiv_diversity_metrics(self, metrics):
@@ -251,6 +260,10 @@ class SingleRunData:
                     )
                 case IndivDiversityMetric.IFMed:
                     self.indiv_metrics[IndivDiversityMetric.IFMed.value] = IFMed(
+                        self.populations
+                    )
+                case IndivDiversityMetric.IFIQR:
+                    self.indiv_metrics[IndivDiversityMetric.IFIQR.value] = IFIQR(
                         self.populations
                     )
 
@@ -312,7 +325,7 @@ class SingleRunData:
             raise FileNotFoundError(f"File {filename}.json not found.")
         except:
             raise BaseException(f"File {filename}.json could not be loaded.")
-        
+
         single_run = SingleRunData()
         single_run.algorithm_name = data_dict["algorithm_name"]
         single_run.algorithm_parameters = data_dict["algorithm_parameters"]
