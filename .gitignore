@@ -11,5 +11,12 @@
 !tools/ml_tools.py
 !tools/optimization_tools.py
 !tools/metaheuristic_similarity_analyzer.py
+!tools/algorithms
+!tools/algorithms/pso.py
+!tools/algorithms/fa.py
+!tools/problems
+!tools/problems/problem.py
+!tools/problems/schwefel.py
+!tools/problems
 !pyproject.toml
 !.gitignore
