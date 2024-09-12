@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 import os
 from typing import Any
-from util.random import random_float_with_step
+from util.helper import random_float_with_step
 from tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from tools.optimization_tools import optimization_runner
 from util.optimization_data import SingleRunData
@@ -56,10 +56,16 @@ class MetaheuristicSimilarityAnalyzer:
         self.dataset_path = ""
         self.algorithms = []
 
-    def __generate_targets(self):
+    def __generate_targets(self, generate_optimized_targets: bool = False):
+        r"""Generate target solutions.
+
+        Args:
+            generate_optimized_targets (Optional[bool]): Generate target solutions by parameter tuning if True, otherwise generate random targets.
+        """
         low_ranges = []
         high_ranges = []
         steps = []
+
         for alg_name in self.target_gene_space:
             if not isinstance(alg_name, str) and issubclass(alg_name, Algorithm):
                 algorithm = alg_name()
@@ -96,11 +102,38 @@ class MetaheuristicSimilarityAnalyzer:
                 high_ranges.append(self.target_gene_space[alg_name][setting]["high"])
                 steps.append(self.target_gene_space[alg_name][setting]["step"])
 
-        for _ in range(self.comparisons):
-            target_solution = []
-            for low, high, step in zip(low_ranges, high_ranges, steps):
-                target_solution.append(random_float_with_step(low=low, high=high, step=step))
-            self.target_solutions.append(np.array(target_solution))
+        self.__create_folder_structure()
+
+        for idx in range(self.comparisons):
+            if generate_optimized_targets:
+                meta_ga = MetaGA(
+                    fitness_function_type=MetaGAFitnessFunction.PARAMETER_TUNING,
+                    ga_generations=self.meta_ga.ga_generations,
+                    ga_solutions_per_pop=self.meta_ga.ga_solutions_per_pop,
+                    ga_percent_parents_mating=self.meta_ga.ga_percent_parents_mating,
+                    ga_parent_selection_type=self.meta_ga.ga_parent_selection_type,
+                    ga_k_tournament=self.meta_ga.ga_k_tournament,
+                    ga_crossover_type=self.meta_ga.ga_crossover_type,
+                    ga_mutation_type=self.meta_ga.ga_mutation_type,
+                    ga_crossover_probability=self.meta_ga.ga_crossover_probability,
+                    ga_mutation_num_genes=self.meta_ga.ga_mutation_num_genes,
+                    ga_keep_elitism=self.meta_ga.ga_keep_elitism,
+                    gene_spaces=self.target_gene_space,
+                    pop_size=self.meta_ga.pop_size,
+                    max_evals=self.meta_ga.max_evals,
+                    num_runs=self.meta_ga.num_runs,
+                    problem=self.meta_ga.problem,
+                    base_archive_path=os.path.join(self.archive_path, "target_tuning")
+                )               
+                target_solution = meta_ga.run_meta_ga(prefix=str(idx), return_best_solution=True)
+                self.target_solutions.append(target_solution)
+            else:
+                target_solution = []
+                for low, high, step in zip(low_ranges, high_ranges, steps):
+                    target_solution.append(
+                        random_float_with_step(low=low, high=high, step=step)
+                    )
+                self.target_solutions.append(np.array(target_solution))
 
     def generate_dataset_from_solutions(self, num_runs: int = None):
         r"""Generate dataset from target and optimized solutions.
@@ -135,7 +168,6 @@ class MetaheuristicSimilarityAnalyzer:
                     dataset_path=_subset_path,
                     pop_diversity_metrics=self.meta_ga.pop_diversity_metrics,
                     indiv_diversity_metrics=self.meta_ga.indiv_diversity_metrics,
-                    max_iters=self.meta_ga.max_iters,
                     max_evals=self.meta_ga.max_evals,
                     run_index_seed=True,
                     keep_pop_data=False,
@@ -177,10 +209,18 @@ class MetaheuristicSimilarityAnalyzer:
         if os.path.exists(self.archive_path) == False:
             Path(self.archive_path).mkdir(parents=True, exist_ok=True)
 
-    def run_similarity_analysis(self, get_info=False, generate_dataset=False):
+    def run_similarity_analysis(
+        self,
+        target_solutions: dict[str, list[np.ndarray]] = None,
+        generate_optimized_targets: bool = False,
+        get_info=False,
+        generate_dataset=False,
+    ):
         r"""Run metaheuristic similarity analysis.
 
         Args:
+            target_solutions (Optional[dict[str, list[np.ndarray]]]): Target solutions. Length of the list must match `comparisons` parameter. Generated if None.
+            generate_optimized_targets (Optional[bool]): Generate target solutions by parameter tuning. Has no effect if `target_solutions` is not None.
             get_info (Optional[bool]): Generate info scheme of the metaheuristic similarity analyzer (false by default).
             generate_dataset (Optional[bool]): Generate dataset from target and optimized solutions after analysis (false by default).
         """
@@ -193,8 +233,13 @@ class MetaheuristicSimilarityAnalyzer:
                 "The `meta_ga` parameter must be defined and the fitness function must be set to `TARGET_PERFORMANCE_SIMILARITY`."
             )
 
-        self.__generate_targets()
-        self.__create_folder_structure()
+        if target_solutions is None:
+            self.__generate_targets(generate_optimized_targets)
+        else:
+            self.algorithms = [list(target_solutions.keys())[0]]
+            self.target_solutions = target_solutions[self.algorithms[0]]
+            self.__create_folder_structure()
+
         self.meta_ga.base_archive_path = self.archive_path
 
         if get_info:
@@ -272,9 +317,15 @@ class MetaheuristicSimilarityAnalyzer:
         gv.attr(rankdir="TD", compound="true")
         gv.attr("node", shape="box")
         gv.attr("graph", fontname="bold")
+        gv.attr("graph", splines="false")
 
         with gv.subgraph(name="cluster_0") as c:
-            c.attr(style="filled", color=graph_color, name="msa", label="MSA")
+            c.attr(
+                style="filled",
+                color=graph_color,
+                name="msa",
+                label="Metaheuristics Similarity Analyzer",
+            )
             c.node_attr.update(
                 style="filled",
                 color=table_border_color,
@@ -313,6 +364,7 @@ class MetaheuristicSimilarityAnalyzer:
                     margin="0",
                 )
 
+                target_parameters_len = 0
                 for algorithm in list(self.target_gene_space.keys()):
                     if not isinstance(algorithm, str) and issubclass(
                         algorithm, Algorithm
@@ -337,8 +389,28 @@ class MetaheuristicSimilarityAnalyzer:
                             ].values()
                         )
                         node_label += f"<tr><td>{setting}</td><td>[{gene}]</td></tr>"
+                        target_parameters_len += 1
                     node_label += "</table>>"
                     cc.node(name=f"target_gene_space", label=node_label)
+
+                target_parameters = f"""<
+                    <table border="0" cellborder="1" cellspacing="0">
+                        <tr>
+                            <td colspan="3"><b>Parameters</b></td>
+                        </tr>
+                        <tr>
+                            <td>p<i><sub>1</sub></i></td>
+                            <td>...</td>
+                            <td>p<i><sub>{target_parameters_len}</sub></i></td>
+                        </tr>
+                    </table>>"""
+                cc.node(name=f"target_parameters", label=target_parameters)
+
+                cc.edge(
+                    "target_gene_space",
+                    "target_parameters",
+                    label="random set \nof target \nparameter settings",
+                )
 
         with gv.subgraph(name="cluster_1") as c:
             c.attr(style="filled", color=graph_color, name="meta_ga", label="Meta GA")
@@ -404,13 +476,14 @@ class MetaheuristicSimilarityAnalyzer:
                         <td>{self.meta_ga.rng_seed}</td>
                     </tr>
                 </table>>"""
-            
+
             c.node_attr.update(
                 style="filled",
                 color=table_border_color,
                 fillcolor=table_background_color,
                 shape="box",
             )
+
             c.node(
                 name="cosine_similarity",
                 label="Cosine similarity",
@@ -419,7 +492,7 @@ class MetaheuristicSimilarityAnalyzer:
             )
 
             c.node(name="meta_ga_parameters", label=meta_ga_parameters_label)
-            
+
             with c.subgraph(name="cluster_10") as cc:
                 cc.attr(
                     style="filled",
@@ -465,7 +538,6 @@ class MetaheuristicSimilarityAnalyzer:
                     node_label += "</table>>"
                     cc.node(name=f"gene_space_{alg_idx}", label=node_label)
 
-
                 combined_gene_string = f"""<
                 <table border="0" cellborder="1" cellspacing="0">
                     <tr>
@@ -508,8 +580,8 @@ class MetaheuristicSimilarityAnalyzer:
                         <td colspan="2"><b>Parameters</b></td>
                     </tr>
                     <tr>
-                        <td>max iters</td>
-                        <td>{self.meta_ga.max_iters}</td>
+                        <td>max evals</td>
+                        <td>{self.meta_ga.max_evals}</td>
                     </tr>
                     <tr>
                         <td>num runs</td>
@@ -621,27 +693,31 @@ class MetaheuristicSimilarityAnalyzer:
             )
 
         gv.edge(
+            minlen="3",
             tail_name="combined_gene_space",
             head_name="pop_metrics",
-            label=f"for each solution",
+            xlabel=f"for each \nsolution",
             lhead="cluster_2",
         )
         gv.edge(
+            dir="both",
+            minlen="2",
             tail_name="optimization_parameters",
             head_name="pop_scheme",
             ltail="cluster_2",
             lhead="cluster_3",
         )
         gv.edge(
-            tail_name="optimization_parameters",
-            head_name="cosine_similarity",
-            label="average feature vector \nof the optimized algorithm",
-            ltail="cluster_2",
+            tail_name="target_parameters",
+            head_name="optimization_parameters",
+            label="for every set of \ntarget parameters",
+            lhead="cluster_2",
         )
         gv.edge(
-            tail_name="target_gene_space",
+            tail_name="pop_metrics",
             head_name="cosine_similarity",
-            label="average feature vector \nof the target algorithm",
+            label="average feature vectors \nof target and optimized \nalgorithms \ndiversity metrics",
+            ltail="cluster_2",
         )
 
         gv.attr(fontsize="25")
