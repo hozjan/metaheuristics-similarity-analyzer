@@ -460,6 +460,31 @@ class MetaGA:
                 parallel_processing=True,
             )
 
+        target_runs_path = os.path.join(
+            self.__meta_ga_tmp_data_path,
+            self.__target_algorithm.Name[1],
+            self.problem.name(),
+        )
+        
+        target_runs = os.listdir(target_runs_path)
+        target_runs.sort()
+
+        optimized_runs = []
+        optimized_runs_path = ""
+        for algorithm in os.listdir(meta_dataset):
+            for problem in os.listdir(os.path.join(meta_dataset, algorithm)):
+                optimized_runs_path = os.path.join(meta_dataset, algorithm, problem)
+                optimized_runs = os.listdir(optimized_runs_path)
+                optimized_runs.sort()
+
+        similarities = []
+        for target, optimized in zip(target_runs, optimized_runs):
+            target_srd = SingleRunData.import_from_json(os.path.join(target_runs_path, target))
+            optimized_srd = SingleRunData.import_from_json(os.path.join(optimized_runs_path, optimized))
+            similarities.append(target_srd.get_diversity_metrics_similarity(optimized_srd))
+        
+        return -np.mean(similarities)   
+        """
         optimized_feature_vectors = []
         target_feature_vectors = []
 
@@ -470,6 +495,7 @@ class MetaGA:
         )
         target_runs = os.listdir(target_runs_path)
         target_runs.sort()
+        
         for run in target_runs:
             run_path = os.path.join(
                 target_runs_path,
@@ -491,10 +517,17 @@ class MetaGA:
                         ).get_combined_feature_vector()
                     )
 
+        similarities = []
+        for feature_vector1, feature_vector2 in zip(optimized_feature_vectors, target_feature_vectors):
+            similarities.append(1 - spatial.distance.cosine(feature_vector1, feature_vector2))
+
+        return np.mean(similarities)
+ 
         ofv_mean = np.mean(optimized_feature_vectors, axis=0)
         tfv_mean = np.mean(target_feature_vectors, axis=0)
 
         return 1 - spatial.distance.cosine(ofv_mean, tfv_mean)
+        """
 
     def meta_ga_fitness_function_for_performance_similarity(
         self, meta_ga, solution, solution_idx
@@ -601,6 +634,7 @@ class MetaGA:
         target_algorithm: Algorithm = None,
         get_info=False,
         prefix: str = None,
+        return_best_solution: bool = False
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
@@ -610,6 +644,10 @@ class MetaGA:
             target_algorithm (Optional[Algorithm]): Target algorithm for the performance similarity evaluation. Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
             prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current datetime by default.
+            return_best_solution (Optional[bool]): returns best solution if True.
+
+        Returns:
+            best_solution (numpy.ndarray[float] | None): Returns best solution.
         """
         self.__target_algorithm = target_algorithm
         if (
@@ -671,6 +709,9 @@ class MetaGA:
         )
         best_solutions = self.meta_ga.best_solutions
         print(f"Best solution: {best_solutions[-1]}")
+
+        if return_best_solution:
+            return np.array(best_solutions[-1])
 
     def meta_ga_info(
         self,
