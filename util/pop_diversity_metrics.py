@@ -194,7 +194,7 @@ def FDC(population, population_fitness, problem: Problem):
     else:
         FDC = 0.0
 
-    return FDC
+    return FDC + 1.0
 
 
 def PFSD(population_fitness):
