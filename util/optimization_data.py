@@ -8,6 +8,9 @@ from json import JSONEncoder
 from niapy.util.distances import euclidean
 from niapy.problems import Problem
 from sklearn.decomposition import PCA
+from scipy import spatial
+import math
+from util.helper import s_mape
 
 from util.pop_diversity_metrics import (
     PDC,
@@ -199,29 +202,184 @@ class SingleRunData:
                 )
 
         return pd.DataFrame.from_dict(_indiv_metrics)
-
-    def get_combined_feature_vector(self):
+    
+    def get_combined_feature_vector(self, normalize=True):
         r"""Calculate feature vector composed of PCA eigenvectors and eigenvalues of diversity metrics.
+
+        Args:
+            normalize (Optional[bool]): Take normalized metrics.
 
         Returns:
             features (numpy.ndarray[float]): Vector of combined PCA eigenvectors and eigenvalues of diversity metrics.
         """
-        indiv_metrics = self.get_indiv_diversity_metrics_values(normalize=False)
-        pop_metrics = self.get_pop_diversity_metrics_values(normalize=False)
-        pca_indiv = PCA()
+        indiv_metrics = self.get_indiv_diversity_metrics_values(normalize=normalize)
+        pop_metrics = self.get_pop_diversity_metrics_values(normalize=normalize)
+        """
+        pca_indiv = PCA(svd_solver="full", random_state=0)
         pca_indiv.fit(indiv_metrics)
         indiv_components = pca_indiv.components_.flatten()
-        indiv_variance = pca_indiv.explained_variance_ratio_
-        pca_pop = PCA()
+        indiv_value = pca_indiv.singular_values_
+        pca_pop = PCA(svd_solver="full", random_state=0)
         pca_pop.fit(pop_metrics)
         pop_components = pca_pop.components_.flatten()
-        pop_variance = pca_pop.explained_variance_ratio_
+        pop_value = pca_pop.singular_values_
 
         return np.nan_to_num(
             np.concatenate(
-                (indiv_components, indiv_variance, pop_components, pop_variance)
+                (indiv_components, indiv_value, pop_components, pop_value)
             )
         )
+        """
+
+        indiv_components = []
+        pop_components = []
+
+        pca_indiv = PCA(svd_solver="full", random_state=0)
+        pca_indiv.fit(indiv_metrics)
+        for component, value in zip(pca_indiv.components_, pca_indiv.explained_variance_):
+            indiv_components.extend(component * math.sqrt(value))
+
+        pca_pop = PCA(svd_solver="full", random_state=0)
+        pca_pop.fit(pop_metrics)
+        for component, value in zip(pca_pop.components_, pca_pop.explained_variance_):
+            pop_components.extend(component * math.sqrt(value))
+
+        return np.nan_to_num(
+            np.concatenate(
+                (indiv_components, pop_components)
+            )
+        )
+    
+    def get_combined_feature_vector_from_pairwise_normalized_metrics(self, second:"SingleRunData"):
+        r"""Calculate feature vector composed of PCA eigenvectors and eigenvalues of diversity metrics,
+        by normalizing diversity metrics pairwise between runs.
+
+        Returns:
+            features (numpy.ndarray[float]): Vector of combined PCA eigenvectors and eigenvalues of diversity metrics.
+        """
+        first_im = self.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
+        first_pm = self.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
+
+        second_im = second.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
+        second_pm = second.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
+
+        for idx in range(len(first_pm)):
+            min_value = min(np.min(first_pm[idx]), np.min(second_pm[idx]))
+            max_value = max(np.max(first_pm[idx]), np.max(second_pm[idx]))
+
+            first_pm[idx] = (first_pm[idx] - min_value)/(max_value - min_value)
+            second_pm[idx] = (second_pm[idx] - min_value)/(max_value - min_value)
+
+        for idx in range(len(first_im)):
+            min_value = min(np.min(first_im[idx]), np.min(second_im[idx]))
+            max_value = max(np.max(first_im[idx]), np.max(second_im[idx]))
+
+            first_im[idx] = (first_im[idx] - min_value)/(max_value - min_value)
+            second_im[idx] = (second_im[idx] - min_value)/(max_value - min_value)
+
+        first_im = first_im.transpose()
+        first_pm = first_pm.transpose()
+        second_im = second_im.transpose()
+        second_pm = second_pm.transpose()
+        
+        first_indiv_components = []
+        first_pop_components = []
+        second_indiv_components = []
+        second_pop_components = []
+
+        pca_indiv = PCA(svd_solver="full", random_state=0)
+        pca_indiv.fit(first_im)
+        for component, value in zip(pca_indiv.components_, pca_indiv.explained_variance_):
+            first_indiv_components.extend(component * math.sqrt(value))
+
+        pca_pop = PCA(svd_solver="full", random_state=0)
+        pca_pop.fit(first_pm)
+        for component, value in zip(pca_pop.components_, pca_pop.explained_variance_):
+            first_pop_components.extend(component * math.sqrt(value))
+
+        first_fv = np.nan_to_num(
+            np.concatenate(
+                (first_indiv_components, first_pop_components)
+            )
+        )
+
+        pca_indiv = PCA(svd_solver="full", random_state=0)
+        pca_indiv.fit(second_im)
+        for component, value in zip(pca_indiv.components_, pca_indiv.explained_variance_):
+            second_indiv_components.extend(component * math.sqrt(value))
+
+        pca_pop = PCA(svd_solver="full", random_state=0)
+        pca_pop.fit(second_pm)
+        for component, value in zip(pca_pop.components_, pca_pop.explained_variance_):
+            second_pop_components.extend(component * math.sqrt(value))
+
+        second_fv = np.nan_to_num(
+            np.concatenate(
+                (second_indiv_components, second_pop_components)
+            )
+        )
+
+        """
+        first_pca_indiv = PCA(svd_solver="full", random_state=0)
+        first_pca_indiv.fit(first_im)
+        first_indiv_components = first_pca_indiv.components_.flatten()
+        first_indiv_value = first_pca_indiv.singular_values_
+        first_pca_pop = PCA(svd_solver="full", random_state=0)
+        first_pca_pop.fit(first_pm)
+        first_pop_components = first_pca_pop.components_.flatten()
+        first_pop_value = first_pca_pop.singular_values_
+
+        second_pca_indiv = PCA(svd_solver="full", random_state=0)
+        second_pca_indiv.fit(second_im)
+        second_indiv_components = second_pca_indiv.components_.flatten()
+        second_indiv_value = second_pca_indiv.singular_values_
+        second_pca_pop = PCA(svd_solver="full", random_state=0)
+        second_pca_pop.fit(second_pm)
+        second_pop_components = second_pca_pop.components_.flatten()
+        second_pop_value = second_pca_pop.singular_values_
+
+        first_fv = np.nan_to_num(
+            np.concatenate(
+                (first_indiv_components, first_indiv_value, first_pop_components, first_pop_value)
+            )
+        )
+
+        second_fv = np.nan_to_num(
+            np.concatenate(
+                (second_indiv_components, second_indiv_value, second_pop_components, second_pop_value)
+            )
+        )
+        """
+
+        return first_fv, second_fv
+    
+    def get_diversity_metrics_similarity(self, second: "SingleRunData", get_raw_values=False):
+        r"""Calculate similarity based on S-MAPE between corresponding diversity metrics.
+
+        Args:
+            get_raw_values (List[DiversityMetric]): Returns a list of S-MAPE values.
+
+        Returns:
+            similarity (float): average S-MAPE value.
+        """
+        first_im = self.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
+        first_pm = self.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
+
+        second_im = second.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
+        second_pm = second.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
+        
+        s_mape_values = []
+        for fpm, spm in zip(first_pm, second_pm):
+            s_mape_values.append(s_mape(fpm, spm))
+
+        for fim, sim in zip(first_im, second_im):
+            s_mape_values.append(s_mape(fim, sim))
+
+        if get_raw_values:
+            return s_mape_values
+        else:
+            return np.mean(s_mape_values)
+
 
     def calculate_indiv_diversity_metrics(self, metrics):
         r"""Calculate Individual diversity metrics.
