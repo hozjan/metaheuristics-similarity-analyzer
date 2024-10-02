@@ -1,7 +1,7 @@
 import numpy as np
 import math
 
-__all__ = ["random_float_with_step", "s_mape"]
+__all__ = ["random_float_with_step", "smape"]
 
 
 def random_float_with_step(low, high, step, size=None, replace=True):
@@ -11,8 +11,8 @@ def random_float_with_step(low, high, step, size=None, replace=True):
     return random_floats
 
 
-def s_mape(first: np.ndarray, second: np.ndarray):
-    """calculates S-MAPE between two arrays.
+def smape(first: np.ndarray, second: np.ndarray):
+    """calculates SMAPE between two arrays.
         Arrays must have the same length.
 
     Args:
@@ -20,7 +20,7 @@ def s_mape(first: np.ndarray, second: np.ndarray):
         second (np.ndarray): second array.
 
     Returns:
-        s-mape (float): S-MAPE value.
+        smape (float): SMAPE value.
     """
 
     return np.mean(

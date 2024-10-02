@@ -10,7 +10,7 @@ from niapy.problems import Problem
 from sklearn.decomposition import PCA
 from scipy import spatial
 import math
-from util.helper import s_mape
+from util.helper import smape
 
 from util.pop_diversity_metrics import (
     PDC,
@@ -214,23 +214,7 @@ class SingleRunData:
         """
         indiv_metrics = self.get_indiv_diversity_metrics_values(normalize=normalize)
         pop_metrics = self.get_pop_diversity_metrics_values(normalize=normalize)
-        """
-        pca_indiv = PCA(svd_solver="full", random_state=0)
-        pca_indiv.fit(indiv_metrics)
-        indiv_components = pca_indiv.components_.flatten()
-        indiv_value = pca_indiv.singular_values_
-        pca_pop = PCA(svd_solver="full", random_state=0)
-        pca_pop.fit(pop_metrics)
-        pop_components = pca_pop.components_.flatten()
-        pop_value = pca_pop.singular_values_
-
-        return np.nan_to_num(
-            np.concatenate(
-                (indiv_components, indiv_value, pop_components, pop_value)
-            )
-        )
-        """
-
+        
         indiv_components = []
         pop_components = []
 
@@ -319,48 +303,17 @@ class SingleRunData:
             )
         )
 
-        """
-        first_pca_indiv = PCA(svd_solver="full", random_state=0)
-        first_pca_indiv.fit(first_im)
-        first_indiv_components = first_pca_indiv.components_.flatten()
-        first_indiv_value = first_pca_indiv.singular_values_
-        first_pca_pop = PCA(svd_solver="full", random_state=0)
-        first_pca_pop.fit(first_pm)
-        first_pop_components = first_pca_pop.components_.flatten()
-        first_pop_value = first_pca_pop.singular_values_
-
-        second_pca_indiv = PCA(svd_solver="full", random_state=0)
-        second_pca_indiv.fit(second_im)
-        second_indiv_components = second_pca_indiv.components_.flatten()
-        second_indiv_value = second_pca_indiv.singular_values_
-        second_pca_pop = PCA(svd_solver="full", random_state=0)
-        second_pca_pop.fit(second_pm)
-        second_pop_components = second_pca_pop.components_.flatten()
-        second_pop_value = second_pca_pop.singular_values_
-
-        first_fv = np.nan_to_num(
-            np.concatenate(
-                (first_indiv_components, first_indiv_value, first_pop_components, first_pop_value)
-            )
-        )
-
-        second_fv = np.nan_to_num(
-            np.concatenate(
-                (second_indiv_components, second_indiv_value, second_pop_components, second_pop_value)
-            )
-        )
-        """
 
         return first_fv, second_fv
     
     def get_diversity_metrics_similarity(self, second: "SingleRunData", get_raw_values=False):
-        r"""Calculate similarity based on S-MAPE between corresponding diversity metrics.
+        r"""Calculate similarity based on SMAPE between corresponding diversity metrics.
 
         Args:
-            get_raw_values (List[DiversityMetric]): Returns a list of S-MAPE values.
+            get_raw_values (List[DiversityMetric]): Returns a list of SMAPE values.
 
         Returns:
-            similarity (float): average S-MAPE value.
+            similarity (float): average SMAPE value.
         """
         first_im = self.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
         first_pm = self.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
@@ -368,17 +321,17 @@ class SingleRunData:
         second_im = second.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
         second_pm = second.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
         
-        s_mape_values = []
+        smape_values = []
         for fpm, spm in zip(first_pm, second_pm):
-            s_mape_values.append(s_mape(fpm, spm))
+            smape_values.append(smape(fpm, spm))
 
         for fim, sim in zip(first_im, second_im):
-            s_mape_values.append(s_mape(fim, sim))
+            smape_values.append(smape(fim, sim))
 
         if get_raw_values:
-            return s_mape_values
+            return smape_values
         else:
-            return np.mean(s_mape_values)
+            return np.mean(smape_values)
 
 
     def calculate_indiv_diversity_metrics(self, metrics):
