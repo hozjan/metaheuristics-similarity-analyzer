@@ -14,8 +14,10 @@ import torch
 from torch import nn
 import numpy as np
 import pygad
+import tools
 from tools.optimization_tools import optimization_runner
 from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTMClassifier
+import tools.problems
 from util.optimization_data import SingleRunData
 import shutil
 import logging
@@ -243,14 +245,11 @@ class MetaGA:
         # check if the provided optimization problem is correct
         if (
             not isinstance(self.problem, Problem)
-            and self.problem.lower() not in _problem_options()
+            and not isinstance(self.problem, tools.problems.problem.Problem)
         ):
-            raise KeyError(
-                f"Could not find optimization problem by name `{self.problem}` in the niapy library."
+            raise TypeError(
+                f"Provided problem type `{type(self.problem).__name__}` is not compatible."
             )
-
-        if not isinstance(self.problem, Problem):
-            self.problem = get_problem(self.problem)
 
     def __create_folder_structure(self, prefix: str = None):
         r"""Create folder structure for the meta genetic algorithm.
@@ -465,7 +464,7 @@ class MetaGA:
             self.__target_algorithm.Name[1],
             self.problem.name(),
         )
-        
+
         target_runs = os.listdir(target_runs_path)
         target_runs.sort()
 
@@ -479,55 +478,17 @@ class MetaGA:
 
         similarities = []
         for target, optimized in zip(target_runs, optimized_runs):
-            target_srd = SingleRunData.import_from_json(os.path.join(target_runs_path, target))
-            optimized_srd = SingleRunData.import_from_json(os.path.join(optimized_runs_path, optimized))
-            similarities.append(target_srd.get_diversity_metrics_similarity(optimized_srd))
-        
-        return -np.mean(similarities)   
-        """
-        optimized_feature_vectors = []
-        target_feature_vectors = []
-
-        target_runs_path = os.path.join(
-            self.__meta_ga_tmp_data_path,
-            self.__target_algorithm.Name[1],
-            self.problem.name(),
-        )
-        target_runs = os.listdir(target_runs_path)
-        target_runs.sort()
-        
-        for run in target_runs:
-            run_path = os.path.join(
-                target_runs_path,
-                run,
+            target_srd = SingleRunData.import_from_json(
+                os.path.join(target_runs_path, target)
             )
-            target_feature_vectors.append(
-                SingleRunData.import_from_json(run_path).get_combined_feature_vector()
+            optimized_srd = SingleRunData.import_from_json(
+                os.path.join(optimized_runs_path, optimized)
+            )
+            similarities.append(
+                target_srd.get_diversity_metrics_similarity(optimized_srd)
             )
 
-        for algorithm in os.listdir(meta_dataset):
-            for problem in os.listdir(os.path.join(meta_dataset, algorithm)):
-                runs = os.listdir(os.path.join(meta_dataset, algorithm, problem))
-                runs.sort()
-                for run in runs:
-                    run_path = os.path.join(meta_dataset, algorithm, problem, run)
-                    optimized_feature_vectors.append(
-                        SingleRunData.import_from_json(
-                            run_path
-                        ).get_combined_feature_vector()
-                    )
-
-        similarities = []
-        for feature_vector1, feature_vector2 in zip(optimized_feature_vectors, target_feature_vectors):
-            similarities.append(1 - spatial.distance.cosine(feature_vector1, feature_vector2))
-
-        return np.mean(similarities)
- 
-        ofv_mean = np.mean(optimized_feature_vectors, axis=0)
-        tfv_mean = np.mean(target_feature_vectors, axis=0)
-
-        return 1 - spatial.distance.cosine(ofv_mean, tfv_mean)
-        """
+        return -np.mean(similarities)
 
     def meta_ga_fitness_function_for_performance_similarity(
         self, meta_ga, solution, solution_idx
@@ -634,7 +595,7 @@ class MetaGA:
         target_algorithm: Algorithm = None,
         get_info=False,
         prefix: str = None,
-        return_best_solution: bool = False
+        return_best_solution: bool = False,
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
@@ -818,11 +779,13 @@ class MetaGA:
                 )
                 combined_gene_space_len = 0
                 for alg_idx, algorithm in enumerate(list(self.gene_spaces.keys())):
-                    if not isinstance(algorithm, str) and issubclass(algorithm, Algorithm):
+                    if not isinstance(algorithm, str) and issubclass(
+                        algorithm, Algorithm
+                    ):
                         alg_name = algorithm.Name[0]
                     elif isinstance(algorithm, str):
                         alg_name = algorithm
-                    
+
                     node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
                         <tr>
                             <td colspan="2"><b>{alg_name}</b></td>

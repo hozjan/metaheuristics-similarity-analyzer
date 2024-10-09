@@ -5,6 +5,7 @@
 from abc import ABC, abstractmethod
 import logging
 from niapy.util.array import full_array
+from niapy.problems import Problem as Problem_niapy
 
 logging.basicConfig()
 logger = logging.getLogger('niapy.problems.problem')
@@ -13,7 +14,7 @@ logger.setLevel('INFO')
 __all__ = ['Problem']
 
 
-class Problem(ABC):
+class Problem(Problem_niapy):
     r"""Class representing an optimization problem.
 
     Attributes:
@@ -32,9 +33,8 @@ class Problem(ABC):
             upper (Optional[Union[float, Iterable[float]]]): Upper bounds of the problem.
 
         """
-        self.dimension = dimension
-        self.lower = full_array(lower, dimension)
-        self.upper = full_array(upper, dimension)
+        super().__init__(dimension, lower, upper, args, kwargs)
+
         self.global_optimum = None
         if "global_optimum" in kwargs:
             self.global_optimum = full_array(kwargs.get("global_optimum"), dimension)
