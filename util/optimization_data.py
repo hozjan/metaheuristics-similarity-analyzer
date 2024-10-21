@@ -20,15 +20,13 @@ from util.pop_diversity_metrics import (
     PDI,
     FDC,
     PFSD,
-    PFMea,
-    PFMed,
+    PFM,
     PopDiversityMetric,
 )
 from util.indiv_diversity_metrics import (
     IDT,
     ISI,
-    IFMea,
-    IFMed,
+    IFM,
     IFIQR,
     IndivDiversityMetric,
 )
@@ -92,10 +90,8 @@ class PopulationData:
                     self.metrics_values[metric.value] = PDI(self.population, problem)
                 case PopDiversityMetric.PFSD:
                     self.metrics_values[metric.value] = PFSD(self.population_fitness)
-                case PopDiversityMetric.PFMea:
-                    self.metrics_values[metric.value] = PFMea(self.population_fitness)
-                case PopDiversityMetric.PFMed:
-                    self.metrics_values[metric.value] = PFMed(self.population_fitness)
+                case PopDiversityMetric.PFM:
+                    self.metrics_values[metric.value] = PFM(self.population_fitness)
                 case PopDiversityMetric.FDC:
                     self.metrics_values[metric.value] = FDC(
                         self.population, self.population_fitness, problem
@@ -365,13 +361,9 @@ class SingleRunData:
                     self.indiv_metrics[IndivDiversityMetric.ISI.value] = ISI(
                         self.populations, self.algorithm_parameters["population_size"]
                     )
-                case IndivDiversityMetric.IFMea:
-                    self.indiv_metrics[IndivDiversityMetric.IFMea.value] = IFMea(
+                case IndivDiversityMetric.IFM:
+                    self.indiv_metrics[IndivDiversityMetric.IFM.value] = IFM(
                         self.populations, self.algorithm_parameters["population_size"]
-                    )
-                case IndivDiversityMetric.IFMed:
-                    self.indiv_metrics[IndivDiversityMetric.IFMed.value] = IFMed(
-                        self.populations
                     )
                 case IndivDiversityMetric.IFIQR:
                     self.indiv_metrics[IndivDiversityMetric.IFIQR.value] = IFIQR(

@@ -5,19 +5,18 @@ from niapy.problems import Problem
 from niapy.util.distances import euclidean
 import itertools
 
-__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFMea", "PFMed"]
+__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFM"]
 
 
 class PopDiversityMetric(Enum):
-    PDC = "pdc"
-    PED = "ped"
-    PMD = "pmd"
-    AAD = "aad"
-    PDI = "pdi"
-    FDC = "fdc"
-    PFSD = "pfsd"
-    PFMea = "pfmea"
-    PFMed = "pfmed"
+    PDC = "PDC"
+    PED = "PED"
+    PMD = "PMD"
+    AAD = "AAD"
+    PDI = "PDI"
+    FDC = "FDC"
+    PFSD = "PFSD"
+    PFM = "PFM"
 
 
 def PDC(population, problem: Problem):
@@ -209,25 +208,13 @@ def PFSD(population_fitness):
     return population_fitness.std()
 
 
-def PFMea(population_fitness):
+def PFM(population_fitness):
     r"""Population Fitness Mean.
 
     Args:
         population_fitness (numpy.ndarray): population fitness.
 
     Returns:
-        PFMea value.
+        PFM value.
     """
     return population_fitness.mean()
-
-
-def PFMed(population_fitness):
-    r"""Population Fitness Median.
-
-    Args:
-        population_fitness (numpy.ndarray): population fitness.
-
-    Returns:
-        PFMed value.
-    """
-    return np.median(population_fitness)

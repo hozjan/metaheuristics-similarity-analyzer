@@ -7,15 +7,14 @@ import copy
 import scipy.stats
 
 
-__all__ = ["IDT", "ISI", "IFMea", "IFMed", "IFIQR"]
+__all__ = ["IDT", "ISI", "IFM", "IFIQR"]
 
 
 class IndivDiversityMetric(Enum):
-    IDT = "idt"
-    ISI = "isi"
-    IFMea = "ifmea"
-    IFMed = "ifmed"
-    IFIQR = "ifiqr"
+    IDT = "IDT"
+    ISI = "ISI"
+    IFM = "IFM"
+    IFIQR = "IFIQR"
 
 
 def IDT(populations, pop_size):
@@ -67,7 +66,7 @@ def ISI(populations, pop_size, return_idt=False):
     return isi, idt if return_idt else isi
 
 
-def IFMea(populations, pop_size):
+def IFM(populations, pop_size):
     r"""Individual Fitness Mean.
 
     Args:
@@ -75,29 +74,13 @@ def IFMea(populations, pop_size):
         pop_size (int): Population size.
 
     Returns:
-        numpy.ndarray: Array of IFMea values.
+        numpy.ndarray: Array of IFM values.
     """
     sums = np.zeros(pop_size)
     for t in range(len(populations) - 1):
         sums = np.add(sums, populations[t].population_fitness)
 
     return sums / len(populations)
-
-
-def IFMed(populations):
-    r"""Individual Fitness Median.
-
-    Args:
-        populations (numpy.ndarray[PopulationData]): Populations.
-
-    Returns:
-        numpy.ndarray: Array of IFMed values.
-    """
-    fitness_values = []
-    for t in range(len(populations) - 1):
-        fitness_values.append(populations[t].population_fitness)
-
-    return np.median(fitness_values, axis=0)
 
 
 def IFIQR(populations):
