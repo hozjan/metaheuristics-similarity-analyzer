@@ -488,7 +488,7 @@ class MetaGA:
                 target_srd.get_diversity_metrics_similarity(optimized_srd)
             )
 
-        return -np.mean(similarities)
+        return np.mean(similarities)
 
     def meta_ga_fitness_function_for_performance_similarity(
         self, meta_ga, solution, solution_idx

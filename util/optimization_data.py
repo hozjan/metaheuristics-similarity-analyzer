@@ -303,13 +303,14 @@ class SingleRunData:
         return first_fv, second_fv
     
     def get_diversity_metrics_similarity(self, second: "SingleRunData", get_raw_values=False):
-        r"""Calculate similarity based on SMAPE between corresponding diversity metrics.
+        r"""Calculate similarity based on 1-SMAPE between corresponding diversity metrics of two runs.
 
         Args:
-            get_raw_values (List[DiversityMetric]): Returns a list of SMAPE values.
+            second (SingleRunData): SingleRunData object for diversity metrics comparison.
+            get_raw_values (Optional[bool]): Returns an array of 1-SMAPE values if true.
 
         Returns:
-            similarity (float): average SMAPE value.
+            similarity (float | numpy.ndarray[float]): mean 1-SMAPE value or array of 1-SMAPE values if get_raw_values is true.
         """
         first_im = self.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
         first_pm = self.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
@@ -325,7 +326,7 @@ class SingleRunData:
             smape_values.append(smape(fim, sim))
 
         if get_raw_values:
-            return smape_values
+            return np.array(smape_values)
         else:
             return np.mean(smape_values)
 

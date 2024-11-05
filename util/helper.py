@@ -12,7 +12,7 @@ def random_float_with_step(low, high, step, size=None, replace=True):
 
 
 def smape(first: np.ndarray, second: np.ndarray):
-    """calculates SMAPE between two arrays.
+    """calculates 1-SMAPE between two arrays.
         Arrays must have the same length.
 
     Args:
@@ -20,9 +20,9 @@ def smape(first: np.ndarray, second: np.ndarray):
         second (np.ndarray): second array.
 
     Returns:
-        smape (float): SMAPE value.
+        1-smape (float): 1-SMAPE value.
     """
 
-    return np.mean(
+    return 1.0 - np.mean(
         np.abs((first - second)) / (np.abs(first) + np.abs(second) + math.ulp(0.0))
     )
