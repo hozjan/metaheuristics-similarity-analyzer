@@ -68,7 +68,7 @@ class PopulationData:
         self.metrics_values = {}
 
     def calculate_metrics(
-        self, metrics: List[PopDiversityMetric], problem: Problem = None
+        self, metrics: list[PopDiversityMetric], problem: Problem = None
     ):
         r"""Calculate diversity metrics.
 
@@ -106,7 +106,7 @@ class SingleRunData:
     def __init__(
         self,
         algorithm_name: str = None,
-        algorithm_parameters: Dict[str, Any] = None,
+        algorithm_parameters: dict[str, Any] = None,
         problem_name: str = None,
         max_evals: int = np.inf,
         max_iters: int = np.inf,
@@ -146,13 +146,17 @@ class SingleRunData:
         self.best_solution = population_data.best_solution
 
     def get_pop_diversity_metrics_values(
-        self, metrics: list[PopDiversityMetric] = None, normalize=False
+        self,
+        metrics: list[PopDiversityMetric] = None,
+        minmax_scale: bool = False,
+        standard_scale: bool = False,
     ):
         r"""Get population diversity metrics values.
 
         Args:
-            metrics (List[DiversityMetric]): List of metrics to return. Returns all metrics if None (by default).
-            normalize (Optional[bool]): Method returns normalized values if true.
+            metrics (List[PopDiversityMetric]): List of metrics to return. Returns all metrics if None (by default).
+            minmax_scale (Optional[bool]): Method returns min-max scaled values to range [0,1] if true and `standard_scale` is false.
+            standard_scale (Optional[bool]): Method returns standardized metrics if true.
 
         Returns:
             pandas.DataFrame: Metrics values throughout the run
@@ -172,51 +176,93 @@ class SingleRunData:
         else:
             _pop_metrics = dict(self.pop_metrics)
 
-        if normalize and len(_pop_metrics) != 0:
+        if minmax_scale and len(_pop_metrics) != 0:
             for metric in _pop_metrics:
                 _pop_metrics[metric] = sklearn.preprocessing.minmax_scale(
                     _pop_metrics[metric], feature_range=(0, 1)
                 )
+        if standard_scale and len(_pop_metrics) != 0:
+            for metric in _pop_metrics:
+                scaler = sklearn.preprocessing.StandardScaler()
+                _pop_metrics[metric] = (
+                    scaler.fit_transform(
+                        np.array(_pop_metrics[metric]).reshape((-1, 1))
+                    )
+                    .reshape((-1))
+                    .tolist()
+                )
 
         return pd.DataFrame.from_dict(_pop_metrics)
 
-    def get_indiv_diversity_metrics_values(self, normalize=False):
+    def get_indiv_diversity_metrics_values(
+        self,
+        metrics: list[IndivDiversityMetric] = None,
+        minmax_scale: bool = False,
+        standard_scale: bool = False,
+    ):
         r"""Get individual diversity metrics values.
 
         Args:
-            normalize (Optional[bool]): Method returns normalized values if true.
+            metrics (List[IndivDiversityMetric]): List of metrics to return. Returns all metrics if None (by default).
+            minmax_scale (Optional[bool]):  Method returns min-max scaled values to range [0,1] if true and `standard_scale` is false.
+            standard_scale (Optional[bool]): Method returns standardized metrics if true.
 
         Returns:
             pandas.DataFrame: Metrics values throughout the run
         """
-        _indiv_metrics = dict(self.indiv_metrics)
 
-        if normalize:
+        if not (metrics is None):
+            _indiv_metrics = {}
+            for metric in metrics:
+                if metric.value in self.indiv_metrics:
+                    _indiv_metrics[metric.value] = self.indiv_metrics.get(metric.value)
+        else:
+            _indiv_metrics = dict(self.indiv_metrics)
+
+        if minmax_scale:
             for metric in _indiv_metrics:
                 _indiv_metrics[metric] = sklearn.preprocessing.minmax_scale(
                     _indiv_metrics[metric], feature_range=(0, 1)
                 )
+        if standard_scale and len(_indiv_metrics) != 0:
+            for metric in _indiv_metrics:
+                scaler = sklearn.preprocessing.StandardScaler()
+                _indiv_metrics[metric] = (
+                    scaler.fit_transform(
+                        np.array(_indiv_metrics[metric]).reshape((-1, 1))
+                    )
+                    .reshape((-1))
+                    .tolist()
+                )
 
         return pd.DataFrame.from_dict(_indiv_metrics)
-    
-    def get_combined_feature_vector(self, normalize=True):
-        r"""Calculate feature vector composed of PCA eigenvectors and eigenvalues of diversity metrics.
+
+    def get_feature_vector(self, standard_scale=True, minmax_scale=False):
+        r"""Calculate feature vector composed of catenated PCA eigenvectors multiplied by square root of corresponding eigenvalues of diversity metrics.
 
         Args:
-            normalize (Optional[bool]): Take normalized metrics.
+            standard_scale (Optional[bool]): Use standard scaled diversity metrics.
+            min_max_scale (Optional[bool]): Use min-max scaled diversity metrics.
 
         Returns:
-            features (numpy.ndarray[float]): Vector of combined PCA eigenvectors and eigenvalues of diversity metrics.
+            features (numpy.ndarray[float]): Vector of concatenated PCA eigenvectors multiplied by square root of corresponding eigenvalues of diversity metrics.
         """
-        indiv_metrics = self.get_indiv_diversity_metrics_values(normalize=normalize)
-        pop_metrics = self.get_pop_diversity_metrics_values(normalize=normalize)
         
+        indiv_metrics = self.get_indiv_diversity_metrics_values(
+            standard_scale=standard_scale, minmax_scale=minmax_scale
+        )
+        pop_metrics = self.get_pop_diversity_metrics_values(
+            standard_scale=standard_scale, minmax_scale=minmax_scale
+        )
+
         indiv_components = []
         pop_components = []
 
         pca_indiv = PCA(svd_solver="full", random_state=0)
         pca_indiv.fit(indiv_metrics)
-        for component, value in zip(pca_indiv.components_, pca_indiv.explained_variance_):
+        for component, value in zip(
+            pca_indiv.components_, pca_indiv.explained_variance_
+        ):
             indiv_components.extend(component * math.sqrt(value))
 
         pca_pop = PCA(svd_solver="full", random_state=0)
@@ -224,85 +270,11 @@ class SingleRunData:
         for component, value in zip(pca_pop.components_, pca_pop.explained_variance_):
             pop_components.extend(component * math.sqrt(value))
 
-        return np.nan_to_num(
-            np.concatenate(
-                (indiv_components, pop_components)
-            )
-        )
-    
-    def get_combined_feature_vector_from_pairwise_normalized_metrics(self, second:"SingleRunData"):
-        r"""Calculate feature vector composed of PCA eigenvectors and eigenvalues of diversity metrics,
-        by normalizing diversity metrics pairwise between runs.
+        return np.nan_to_num(np.concatenate((indiv_components, pop_components)))
 
-        Returns:
-            features (numpy.ndarray[float]): Vector of combined PCA eigenvectors and eigenvalues of diversity metrics.
-        """
-        first_im = self.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
-        first_pm = self.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
-
-        second_im = second.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
-        second_pm = second.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
-
-        for idx in range(len(first_pm)):
-            min_value = min(np.min(first_pm[idx]), np.min(second_pm[idx]))
-            max_value = max(np.max(first_pm[idx]), np.max(second_pm[idx]))
-
-            first_pm[idx] = (first_pm[idx] - min_value)/(max_value - min_value)
-            second_pm[idx] = (second_pm[idx] - min_value)/(max_value - min_value)
-
-        for idx in range(len(first_im)):
-            min_value = min(np.min(first_im[idx]), np.min(second_im[idx]))
-            max_value = max(np.max(first_im[idx]), np.max(second_im[idx]))
-
-            first_im[idx] = (first_im[idx] - min_value)/(max_value - min_value)
-            second_im[idx] = (second_im[idx] - min_value)/(max_value - min_value)
-
-        first_im = first_im.transpose()
-        first_pm = first_pm.transpose()
-        second_im = second_im.transpose()
-        second_pm = second_pm.transpose()
-        
-        first_indiv_components = []
-        first_pop_components = []
-        second_indiv_components = []
-        second_pop_components = []
-
-        pca_indiv = PCA(svd_solver="full", random_state=0)
-        pca_indiv.fit(first_im)
-        for component, value in zip(pca_indiv.components_, pca_indiv.explained_variance_):
-            first_indiv_components.extend(component * math.sqrt(value))
-
-        pca_pop = PCA(svd_solver="full", random_state=0)
-        pca_pop.fit(first_pm)
-        for component, value in zip(pca_pop.components_, pca_pop.explained_variance_):
-            first_pop_components.extend(component * math.sqrt(value))
-
-        first_fv = np.nan_to_num(
-            np.concatenate(
-                (first_indiv_components, first_pop_components)
-            )
-        )
-
-        pca_indiv = PCA(svd_solver="full", random_state=0)
-        pca_indiv.fit(second_im)
-        for component, value in zip(pca_indiv.components_, pca_indiv.explained_variance_):
-            second_indiv_components.extend(component * math.sqrt(value))
-
-        pca_pop = PCA(svd_solver="full", random_state=0)
-        pca_pop.fit(second_pm)
-        for component, value in zip(pca_pop.components_, pca_pop.explained_variance_):
-            second_pop_components.extend(component * math.sqrt(value))
-
-        second_fv = np.nan_to_num(
-            np.concatenate(
-                (second_indiv_components, second_pop_components)
-            )
-        )
-
-
-        return first_fv, second_fv
-    
-    def get_diversity_metrics_similarity(self, second: "SingleRunData", get_raw_values=False):
+    def get_diversity_metrics_similarity(
+        self, second: "SingleRunData", get_raw_values=False
+    ):
         r"""Calculate similarity based on 1-SMAPE between corresponding diversity metrics of two runs.
 
         Args:
@@ -312,12 +284,12 @@ class SingleRunData:
         Returns:
             similarity (float | numpy.ndarray[float]): mean 1-SMAPE value or array of 1-SMAPE values if get_raw_values is true.
         """
-        first_im = self.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
-        first_pm = self.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
+        first_im = self.get_indiv_diversity_metrics_values().to_numpy().transpose()
+        first_pm = self.get_pop_diversity_metrics_values().to_numpy().transpose()
 
-        second_im = second.get_indiv_diversity_metrics_values(normalize=False).to_numpy().transpose()
-        second_pm = second.get_pop_diversity_metrics_values(normalize=False).to_numpy().transpose()
-        
+        second_im = second.get_indiv_diversity_metrics_values().to_numpy().transpose()
+        second_pm = second.get_pop_diversity_metrics_values().to_numpy().transpose()
+
         smape_values = []
         for fpm, spm in zip(first_pm, second_pm):
             smape_values.append(smape(fpm, spm))
@@ -329,7 +301,6 @@ class SingleRunData:
             return np.array(smape_values)
         else:
             return np.mean(smape_values)
-
 
     def calculate_indiv_diversity_metrics(self, metrics):
         r"""Calculate Individual diversity metrics.
