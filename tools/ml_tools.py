@@ -406,6 +406,7 @@ def svm_and_knn_classification(
     alg_2_label: str,
     bar_chart_filename: str = None,
     box_plot_filename: str = None,
+    json_filename: str = None,
 ):
     r"""Evaluate similarity of metaheuristics with SVM and KNN classifiers based on feature vectors.
     Based on assumption should models perform worse when distinguishing metaheuristics with higher similarity.
@@ -587,11 +588,27 @@ def svm_and_knn_classification(
     if box_plot_filename is not None:
         fig.savefig(box_plot_filename, bbox_inches="tight")
     
+    accuracy = np.concatenate((k_svm_scores, knn_scores), axis=1)
+
+    table = ""
+    for line in accuracy:
+        table += " & ".join(map(str, np.round(line, 2))) + "\n"
+
     accuracy = {
         "svm_train": np.round(k_svm_scores.transpose()[0], 2).tolist(),
         "svm_test": np.round(k_svm_scores.transpose()[1], 2).tolist(),
         "knn_train": np.round(knn_scores.transpose()[0], 2).tolist(),
         "knn_test": np.round(knn_scores.transpose()[1], 2).tolist(),
+        "table": table,
+        "min": f"{round(np.min(k_svm_scores[0]), 2)} & {round(np.min(k_svm_scores[1]), 2)} & {round(np.min(knn_scores[0]), 2)} & {round(np.min(knn_scores[1]), 2)}",
+        "mean": f"{round(np.mean(k_svm_scores[0]), 2)} & {round(np.mean(k_svm_scores[1]), 2)} & {round(np.mean(knn_scores[0]), 2)} & {round(np.mean(knn_scores[1]), 2)}",
+        "max": f"{round(np.max(k_svm_scores[0]), 2)} & {round(np.max(k_svm_scores[1]), 2)} & {round(np.max(knn_scores[0]), 2)} & {round(np.max(knn_scores[1]), 2)}",
+        "std": f"{round(np.std(k_svm_scores[0]), 2)} & {round(np.std(k_svm_scores[1]), 2)} & {round(np.std(knn_scores[0]), 2)} & {round(np.std(knn_scores[1]), 2)}",
     }
 
-    return accuracy
+    serialized = json.dumps(accuracy)
+
+    with open(json_filename, "w") as outfile:
+        outfile.write(serialized)
+
+    # return accuracy
