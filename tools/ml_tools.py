@@ -20,6 +20,7 @@ from matplotlib import pyplot as plt
 from enum import Enum
 import os
 import numpy as np
+import json
 
 from util.optimization_data import SingleRunData
 
@@ -55,10 +56,10 @@ class data_generator(torch.utils.data.Dataset):
         run = SingleRunData.import_from_json(self.data_path_list[index])
         if self.nn_type == NNType.LSTM:
             pop_metrics = run.get_pop_diversity_metrics_values(
-                normalize=True
+                standard_scale=True
             ).to_numpy()
             indiv_metrics = run.get_indiv_diversity_metrics_values(
-                normalize=True
+                standard_scale=True
             ).to_numpy()
 
             pca = PCA(n_components=self.n_pca_components)
@@ -72,7 +73,7 @@ class data_generator(torch.utils.data.Dataset):
                 torch.tensor(self.labels.index(run.algorithm_name[1])),
             )
         elif self.nn_type == NNType.LINEAR:
-            feature_vector = run.get_combined_feature_vector(normalize=True)
+            feature_vector = run.get_feature_vector(standard_scale=True)
             return (
                 torch.from_numpy(feature_vector).float(),
                 torch.tensor(self.labels.index(run.algorithm_name[1])),
@@ -399,29 +400,34 @@ def nn_test(
 
 
 def svm_and_knn_classification(
-    dataset_path:str,
-    alg_1_label:str,
-    alg_2_label:str,
+    dataset_path: str,
+    repetitions: int,
+    alg_1_label: str,
+    alg_2_label: str,
     bar_chart_filename: str = None,
     box_plot_filename: str = None,
 ):
-    r"""Evaluate similarity of metaheuristics with SVM and KNN classifiers based on feature vectors. 
+    r"""Evaluate similarity of metaheuristics with SVM and KNN classifiers based on feature vectors.
     Based on assumption should models perform worse when distinguishing metaheuristics with higher similarity.
 
     Args:
         dataset_path (str): Path to the root folder containing optimization data arranged into subsets of comparisons of MetaheuristicSimilarityAnalyzer.
+        repetitions (int): Number of training repetitions to get the average 1-accuracy score from.
         alg_1_label (str): Custom label for the first algorithm in the plot title.
         alg_2_label (str): Custom label for the second algorithm in the plot title.
         bar_chart_filename (Optional[str]): Filename of the bar charts showing metric 1-accuracy values of the models per MetaheuristicSimilarityAnalyzer comparison.
         box_plot_filename (Optional[str]): Filename of the box plot showing metric 1-accuracy values of the models for all MetaheuristicSimilarityAnalyzer comparisons.
 
     Returns:
-        mean 1-accuracy scores (dict[str, float]): Dictionary containing mean 1-accuracy scores for train and test subsets of both models.
+        1-accuracy scores (dict[str, numpy.ndarray[float]]): Dictionary containing 1-accuracy scores for train and test subsets of both models.
     """
 
     k_svm_scores = []
     knn_scores = []
-    for subset in os.listdir(dataset_path):
+    subsets = os.listdir(dataset_path)
+    
+    for idx in range(len(subsets)):
+        subset = f"{idx}_subset"
         subset_k_svm_scores = []
         subset_knn_scores = []
         feature_vectors = []
@@ -437,11 +443,11 @@ def svm_and_knn_classification(
                         dataset_path, subset, algorithm, problem, run
                     )
                     srd = SingleRunData.import_from_json(run_path)
-                    feature_vector = srd.get_combined_feature_vector()
+                    feature_vector = srd.get_feature_vector(standard_scale=True)
                     feature_vectors.append(feature_vector)
                     actual_labels.append(idx)
 
-        for _ in range(100):
+        for _ in range(repetitions):
             # train test split
             X_train, X_test, y_train, y_test = train_test_split(
                 feature_vectors, actual_labels, test_size=0.2, shuffle=True
@@ -505,7 +511,7 @@ def svm_and_knn_classification(
 
     k_svm_scores = np.array(k_svm_scores)
     knn_scores = np.array(knn_scores)
-
+    
     index = np.arange(1, len(k_svm_scores[:, 0]) + 1)
     bar_width = 0.35
     (
@@ -580,15 +586,12 @@ def svm_and_knn_classification(
 
     if box_plot_filename is not None:
         fig.savefig(box_plot_filename, bbox_inches="tight")
-
-    svm_mean = np.mean(k_svm_scores, axis=0)
-    knn_mean = np.mean(knn_scores, axis=0)
-
-    mean_accuracy = {
-        "svm_train": round(svm_mean[0], 2),
-        "svm_test": round(svm_mean[1], 2),
-        "knn_train": round(knn_mean[0], 2),
-        "knn_test": round(knn_mean[1], 2),
+    
+    accuracy = {
+        "svm_train": np.round(k_svm_scores.transpose()[0], 2).tolist(),
+        "svm_test": np.round(k_svm_scores.transpose()[1], 2).tolist(),
+        "knn_train": np.round(knn_scores.transpose()[0], 2).tolist(),
+        "knn_test": np.round(knn_scores.transpose()[1], 2).tolist(),
     }
 
-    return mean_accuracy
+    return accuracy
