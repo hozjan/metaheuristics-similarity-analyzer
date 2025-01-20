@@ -1,14 +1,6 @@
 from util.indiv_diversity_metrics import IndivDiversityMetric
 from util.pop_diversity_metrics import PopDiversityMetric
-from niapy.problems.sphere import Sphere
-from niapy.problems.rosenbrock import Rosenbrock
-from niapy.problems.rastrigin import Rastrigin
-from niapy.problems.schwefel import Schwefel
-from niapy.problems.bent_cigar import BentCigar
-from niapy.problems.trid import Trid
-from niapy.problems.zakharov import Zakharov
-from niapy.problems.alpine import Alpine1
-from niapy.problems.griewank import Griewank
+from tools.problems.schwefel import Schwefel
 from tools.algorithms.fa import FireflyAlgorithm
 from tools.algorithms.pso import ParticleSwarmAlgorithm
 import numpy as np
@@ -21,20 +13,19 @@ Optimization parameters
 """
 DATASET_PATH = "./dataset"
 POP_SIZE = 30
-MAX_EVALS = 15000  # per run
-MAX_ITERS = 500  # per run
-NUM_RUNS = 50  # per algorithm
+MAX_EVALS = 10000  # per run
+NUM_RUNS = 30  # per algorithm
 # metrics to calculate when performing optimization
 POP_DIVERSITY_METRICS = [
     PopDiversityMetric.PDC,
     PopDiversityMetric.FDC,
     PopDiversityMetric.PFSD,
-    PopDiversityMetric.PFMea,
+    PopDiversityMetric.PFM,
 ]
 INDIV_DIVERSITY_METRICS = [
     IndivDiversityMetric.IDT,
     IndivDiversityMetric.ISI,
-    IndivDiversityMetric.IFMea,
+    IndivDiversityMetric.IFM,
     IndivDiversityMetric.IFIQR,
 ]
 
@@ -55,8 +46,7 @@ TEST_SIZE = 0.2
 """
 Metaheuristic similarity analyzer parameters
 """
-NUM_COMPARISONS = 5
-
+NUM_COMPARISONS = 30
 
 """
 Meta GA parameters
@@ -74,15 +64,33 @@ META_GA_KEEP_ELITISM = 1
 
 # problem, algorithm and parameter names must match those from the niapy library
 OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
+"""
 GENE_SPACES = {
     FireflyAlgorithm: {
-        "alpha": {"low": 0.01, "high": 1.0, "step": 0.02},
-        "beta0": {"low": 0.01, "high": 1.0, "step": 0.02},
+        "alpha": {"low": 0.01, "high": 1.0, "step": 0.01},
+        "beta0": {"low": 0.01, "high": 1.0, "step": 0.01},
         "gamma": {"low": 0.0, "high": 1.0, "step": 0.001},
         "theta": {"low": 0.95, "high": 1.0, "step": 0.001},
     },
 }
-
+"""
+GENE_SPACES = {
+    "BatAlgorithm": {
+        "loudness": {"low": 0.01, "high": 1.0, "step": 0.01},
+        "pulse_rate": {"low": 0.01, "high": 1.0, "step": 0.01},
+        "alpha": {"low": 0.9, "high": 1.0, "step": 0.001},
+        "gamma": {"low": 0.0, "high": 1.0, "step": 0.01},
+    }
+}
+"""
+GENE_SPACES = {
+    ParticleSwarmAlgorithm: {
+        "c1": {"low": 0.01, "high": 2.5, "step": 0.01},
+        "c2": {"low": 0.01, "high": 2.5, "step": 0.01},
+        "w": {"low": 0.0, "high": 1.0, "step": 0.01},
+    },
+}
+"""
 
 TARGET_GENE_SPACES = {
     "ParticleSwarmAlgorithm": {
