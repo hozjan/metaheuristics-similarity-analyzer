@@ -402,30 +402,28 @@ def nn_test(
 def svm_and_knn_classification(
     dataset_path: str,
     repetitions: int,
-    alg_1_label: str,
-    alg_2_label: str,
     bar_chart_filename: str = None,
     box_plot_filename: str = None,
 ):
     r"""Evaluate similarity of metaheuristics with SVM and KNN classifiers based on feature vectors.
     Based on assumption should models perform worse when distinguishing metaheuristics with higher similarity.
+    To maximize metaheuristics similarity metric `1-accuracy` is used as similarity metric.
 
     Args:
         dataset_path (str): Path to the root folder containing optimization data arranged into subsets of comparisons of MetaheuristicSimilarityAnalyzer.
         repetitions (int): Number of training repetitions to get the average 1-accuracy score from.
-        alg_1_label (str): Custom label for the first algorithm in the plot title.
-        alg_2_label (str): Custom label for the second algorithm in the plot title.
         bar_chart_filename (Optional[str]): Filename of the bar charts showing metric 1-accuracy values of the models per MetaheuristicSimilarityAnalyzer comparison.
         box_plot_filename (Optional[str]): Filename of the box plot showing metric 1-accuracy values of the models for all MetaheuristicSimilarityAnalyzer comparisons.
 
     Returns:
         1-accuracy scores (dict[str, numpy.ndarray[float]]): Dictionary containing 1-accuracy scores for train and test subsets of both models.
     """
-
+    alg_1_label = ""
+    alg_2_label = ""
     k_svm_scores = []
     knn_scores = []
     subsets = os.listdir(dataset_path)
-    
+
     for idx in range(len(subsets)):
         subset = f"{idx}_subset"
         subset_k_svm_scores = []
@@ -433,6 +431,11 @@ def svm_and_knn_classification(
         feature_vectors = []
         actual_labels = []
         for idx, algorithm in enumerate(os.listdir(os.path.join(dataset_path, subset))):
+            if idx == 0 and alg_1_label == "":
+                alg_1_label = algorithm
+            elif idx == 1 and alg_2_label == "":
+                alg_2_label = algorithm
+
             for problem in os.listdir(os.path.join(dataset_path, subset, algorithm)):
                 runs = os.listdir(
                     os.path.join(dataset_path, subset, algorithm, problem)
@@ -486,7 +489,7 @@ def svm_and_knn_classification(
 
             # kNN classifier
             # define the parameter grid
-            param_grid = {"n_neighbors": np.arange(1, 50)}
+            param_grid = {"n_neighbors": np.arange(1, min(50, round(len(y_train)/3)))}
 
             knn = KNeighborsClassifier()
             kf = KFold(n_splits=5, shuffle=True, random_state=None)
@@ -511,7 +514,7 @@ def svm_and_knn_classification(
 
     k_svm_scores = np.array(k_svm_scores)
     knn_scores = np.array(knn_scores)
-    
+
     index = np.arange(1, len(k_svm_scores[:, 0]) + 1)
     bar_width = 0.35
     (
@@ -521,72 +524,72 @@ def svm_and_knn_classification(
     fig.subplots_adjust(hspace=0.5)
 
     # bar charts
-    low = np.min(k_svm_scores)
-    high = np.max(k_svm_scores)
-    ax[0].bar(index, k_svm_scores[:, 0], bar_width, label="train")
-    ax[0].bar(index + bar_width, k_svm_scores[:, 1], bar_width, label="test")
-    ax[0].set_title(f"SVM {alg_1_label} - {alg_2_label}", fontsize=22, pad=10)
-    ax[0].set_xlabel("configuration", fontsize=19, labelpad=10)
-    ax[0].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
-    ax[0].tick_params(axis="x", labelsize=19, rotation=45)
-    ax[0].tick_params(axis="y", labelsize=19)
-    ax[0].legend(fontsize=15)
-    ax[0].xaxis.set_ticks(index + bar_width / 2, index)
-    ax[0].set_ylim(low - 0.5 * (high - low), high + 0.5 * (high - low))
-    ax[0].set_xlim(
-        ax[0].patches[0].get_x() / 2,
-        ax[0].patches[-1].get_x() + ax[0].patches[-1].get_width() * 2,
-    )
-    ax[0].grid(axis="y", color="gray", linestyle="--", linewidth=0.7)
-    ax[0].set_axisbelow(True)
-
-    low = np.min(knn_scores)
-    high = np.max(knn_scores)
-    ax[1].bar(index, knn_scores[:, 0], bar_width, label="train")
-    ax[1].bar(index + bar_width, knn_scores[:, 1], bar_width, label="test")
-    ax[1].set_title(f"KNN {alg_1_label} - {alg_2_label}", fontsize=22, pad=10)
-    ax[1].set_xlabel("configuration", fontsize=19, labelpad=10)
-    ax[1].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
-    ax[1].tick_params(axis="x", labelsize=19, rotation=45)
-    ax[1].tick_params(axis="y", labelsize=19)
-    ax[1].legend(fontsize=15)
-    ax[1].xaxis.set_ticks(index + bar_width / 2, index)
-    ax[1].set_ylim(low - 0.5 * (high - low), high + 0.5 * (high - low))
-    ax[1].set_xlim(
-        ax[1].patches[0].get_x() / 2,
-        ax[1].patches[-1].get_x() + ax[1].patches[-1].get_width() * 2,
-    )
-    ax[1].grid(axis="y", color="gray", linestyle="--", linewidth=0.7)
-    ax[1].set_axisbelow(True)
-
     if bar_chart_filename is not None:
+        low = np.min(k_svm_scores)
+        high = np.max(k_svm_scores)
+        ax[0].bar(index, k_svm_scores[:, 0], bar_width, label="train")
+        ax[0].bar(index + bar_width, k_svm_scores[:, 1], bar_width, label="test")
+        ax[0].set_title(f"SVM {alg_1_label} - {alg_2_label}", fontsize=22, pad=10)
+        ax[0].set_xlabel("configuration", fontsize=19, labelpad=10)
+        ax[0].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
+        ax[0].tick_params(axis="x", labelsize=19, rotation=45)
+        ax[0].tick_params(axis="y", labelsize=19)
+        ax[0].legend(fontsize=15)
+        ax[0].xaxis.set_ticks(index + bar_width / 2, index)
+        ax[0].set_ylim(low - 0.5 * (high - low), high + 0.5 * (high - low))
+        ax[0].set_xlim(
+            ax[0].patches[0].get_x() / 2,
+            ax[0].patches[-1].get_x() + ax[0].patches[-1].get_width() * 2,
+        )
+        ax[0].grid(axis="y", color="gray", linestyle="--", linewidth=0.7)
+        ax[0].set_axisbelow(True)
+
+        low = np.min(knn_scores)
+        high = np.max(knn_scores)
+        ax[1].bar(index, knn_scores[:, 0], bar_width, label="train")
+        ax[1].bar(index + bar_width, knn_scores[:, 1], bar_width, label="test")
+        ax[1].set_title(f"KNN {alg_1_label} - {alg_2_label}", fontsize=22, pad=10)
+        ax[1].set_xlabel("configuration", fontsize=19, labelpad=10)
+        ax[1].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
+        ax[1].tick_params(axis="x", labelsize=19, rotation=45)
+        ax[1].tick_params(axis="y", labelsize=19)
+        ax[1].legend(fontsize=15)
+        ax[1].xaxis.set_ticks(index + bar_width / 2, index)
+        ax[1].set_ylim(low - 0.5 * (high - low), high + 0.5 * (high - low))
+        ax[1].set_xlim(
+            ax[1].patches[0].get_x() / 2,
+            ax[1].patches[-1].get_x() + ax[1].patches[-1].get_width() * 2,
+        )
+        ax[1].grid(axis="y", color="gray", linestyle="--", linewidth=0.7)
+        ax[1].set_axisbelow(True)
+
         fig.savefig(bar_chart_filename, bbox_inches="tight")
 
     # box plots
-    (
-        fig,
-        ax,
-    ) = plt.subplots(1, 2, figsize=(15, 5))
-    fig.subplots_adjust(wspace=0.3)
-    labels = ["train", "test"]
-
-    ax[0].boxplot(k_svm_scores)
-    ax[0].set_xticks(ticks=np.arange(1, len(labels) + 1), labels=labels)
-    ax[0].tick_params(axis="both", labelsize=19)
-    ax[0].set_title(f"SVM  {alg_1_label} - {alg_2_label}", fontsize=22, pad=15)
-    ax[0].tick_params(axis="both", labelsize=19)
-    ax[0].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
-
-    ax[1].boxplot(knn_scores)
-    ax[1].set_xticks(ticks=np.arange(1, len(labels) + 1), labels=labels)
-    ax[1].tick_params(axis="both", labelsize=19)
-    ax[1].set_title(f"KNN  {alg_1_label} - {alg_2_label}", fontsize=22, pad=15)
-    ax[1].tick_params(axis="both", labelsize=19)
-    ax[1].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
-
     if box_plot_filename is not None:
+        (
+            fig,
+            ax,
+        ) = plt.subplots(1, 2, figsize=(15, 5))
+        fig.subplots_adjust(wspace=0.3)
+        labels = ["train", "test"]
+
+        ax[0].boxplot(k_svm_scores)
+        ax[0].set_xticks(ticks=np.arange(1, len(labels) + 1), labels=labels)
+        ax[0].tick_params(axis="both", labelsize=19)
+        ax[0].set_title(f"SVM  {alg_1_label} - {alg_2_label}", fontsize=22, pad=15)
+        ax[0].tick_params(axis="both", labelsize=19)
+        ax[0].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
+
+        ax[1].boxplot(knn_scores)
+        ax[1].set_xticks(ticks=np.arange(1, len(labels) + 1), labels=labels)
+        ax[1].tick_params(axis="both", labelsize=19)
+        ax[1].set_title(f"KNN  {alg_1_label} - {alg_2_label}", fontsize=22, pad=15)
+        ax[1].tick_params(axis="both", labelsize=19)
+        ax[1].set_ylabel("1-accuracy", fontsize=19, labelpad=10)
+
         fig.savefig(box_plot_filename, bbox_inches="tight")
-    
+
     accuracy = {
         "svm_train": np.round(k_svm_scores.transpose()[0], 2).tolist(),
         "svm_test": np.round(k_svm_scores.transpose()[1], 2).tolist(),
