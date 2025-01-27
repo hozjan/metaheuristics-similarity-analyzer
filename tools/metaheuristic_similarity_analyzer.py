@@ -5,12 +5,14 @@ from typing import Any
 from util.helper import random_float_with_step
 from tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from tools.optimization_tools import optimization_runner
+from tools.ml_tools import svm_and_knn_classification
 from util.optimization_data import SingleRunData
 import numpy as np
-from scipy import spatial
+from scipy import spatial, stats
 import graphviz
 import cloudpickle
 from niapy.algorithms import Algorithm
+from niapy.problems import Problem
 from niapy.util.factory import (
     _algorithm_options,
     get_algorithm,
@@ -49,9 +51,7 @@ class MetaheuristicSimilarityAnalyzer:
         self.comparisons = comparisons
         self.target_solutions = []
         self.optimized_solutions = []
-        self.target_feature_vectors = []
-        self.optimized_solutions_feature_vectors = []
-        self.similarity = []
+        self.similarity_metrics = {}
         self.archive_path = ""
         self.dataset_path = ""
         self.algorithms = []
@@ -123,9 +123,11 @@ class MetaheuristicSimilarityAnalyzer:
                     max_evals=self.meta_ga.max_evals,
                     num_runs=self.meta_ga.num_runs,
                     problem=self.meta_ga.problem,
-                    base_archive_path=os.path.join(self.archive_path, "target_tuning")
-                )               
-                target_solution = meta_ga.run_meta_ga(prefix=str(idx), return_best_solution=True)
+                    base_archive_path=os.path.join(self.archive_path, "target_tuning"),
+                )
+                target_solution = meta_ga.run_meta_ga(
+                    prefix=str(idx), return_best_solution=True
+                )
                 self.target_solutions.append(target_solution)
             else:
                 target_solution = []
@@ -135,6 +137,93 @@ class MetaheuristicSimilarityAnalyzer:
                     )
                 self.target_solutions.append(np.array(target_solution))
 
+    def calculate_similarity_metrics(self):
+        r"""Calculates similarity metrics from diversity metrics values of the comparisons stored in the generated dataset.
+        If no dataset was created method will have no effect.
+        """
+
+        if os.path.exists(self.dataset_path) == False:
+            raise (
+                ValueError(
+                    "Dataset does not exist. Run `generate_dataset_from_solutions` to generate dataset!"
+                )
+            )
+
+        subsets = os.listdir(self.dataset_path)
+
+        mean_smape = []
+        cosine_similarity = []
+        spearman_r = []
+
+        al1 = self.algorithms[0]
+        for algorithm in self.meta_ga.gene_spaces:
+            if not isinstance(algorithm, str) and issubclass(algorithm, Algorithm):
+                al2 = algorithm.Name[1]
+            elif isinstance(algorithm, str) and algorithm not in _algorithm_options():
+                raise KeyError(
+                    f"Could not find algorithm by name `{algorithm}` in the niapy library."
+                )
+            else:
+                al2 = get_algorithm(algorithm).Name[1]
+
+        if isinstance(self.meta_ga.problem, str):
+            problem = self.meta_ga.problem
+        elif isinstance(self.meta_ga.problem, Problem):
+            problem = self.meta_ga.problem.name()
+
+        for idx in range(len(subsets)):
+            subset = f"{idx}_subset"
+            feature_vectors_1 = []
+            feature_vectors_2 = []
+
+            first_runs = os.listdir(
+                os.path.join(self.dataset_path, subset, al1, problem)
+            )
+            second_runs = os.listdir(
+                os.path.join(self.dataset_path, subset, al2, problem)
+            )
+
+            first_runs.sort()
+            second_runs.sort()
+
+            smape_values = []
+            for fr, sr in zip(first_runs, second_runs):
+                first_run_path = os.path.join(
+                    self.dataset_path, subset, al1, problem, fr
+                )
+                second_run_path = os.path.join(
+                    self.dataset_path, subset, al2, problem, sr
+                )
+                f_srd = SingleRunData.import_from_json(first_run_path)
+                s_srd = SingleRunData.import_from_json(second_run_path)
+
+                f_feature_vector = f_srd.get_feature_vector()
+                s_feature_vector = s_srd.get_feature_vector()
+
+                feature_vectors_1.append(f_feature_vector)
+                feature_vectors_2.append(s_feature_vector)
+
+                # calculate 1-SMAPE metric
+                smape_values.append(f_srd.get_diversity_metrics_similarity(s_srd))
+
+            mean_smape.append(round(np.mean(smape_values), 2))
+
+            fv1_mean = np.mean(feature_vectors_1, axis=0)
+            fv2_mean = np.mean(feature_vectors_2, axis=0)
+
+            # calculate cosine similarity and spearman correlation coefficients
+            cosine_similarity.append(1 - spatial.distance.cosine(fv1_mean, fv2_mean))
+            r, p = stats.spearmanr(fv1_mean, fv2_mean)
+            spearman_r.append(r)
+
+        # get knn and svm 1-accuracy metric
+        ml_accuracy = svm_and_knn_classification(self.dataset_path, 100)
+
+        self.similarity_metrics["smape"] = mean_smape
+        self.similarity_metrics["cosine"] = cosine_similarity
+        self.similarity_metrics["smape"] = spearman_r
+        self.similarity_metrics.update(ml_accuracy)
+
     def generate_dataset_from_solutions(self, num_runs: int = None):
         r"""Generate dataset from target and optimized solutions.
 
@@ -143,9 +232,7 @@ class MetaheuristicSimilarityAnalyzer:
         """
         if num_runs is None:
             num_runs = self.meta_ga.num_runs
-        self.similarity = []
-        self.target_feature_vectors = []
-        self.optimized_solutions_feature_vectors = []
+
         for idx, (solution_0, solution_1) in enumerate(
             zip(self.target_solutions, self.optimized_solutions)
         ):
@@ -174,30 +261,6 @@ class MetaheuristicSimilarityAnalyzer:
                     parallel_processing=True,
                 )
 
-            feature_vectors_1 = []
-            feature_vectors_2 = []
-            for idx, algorithm in enumerate(os.listdir(_subset_path)):
-                for problem in os.listdir(os.path.join(_subset_path, algorithm)):
-                    runs = os.listdir(os.path.join(_subset_path, algorithm, problem))
-                    runs.sort()
-                    for run in runs:
-                        run_path = os.path.join(_subset_path, algorithm, problem, run)
-                        srd = SingleRunData.import_from_json(run_path)
-                        feature_vector = srd.get_combined_feature_vector()
-
-                        if idx == 0:
-                            feature_vectors_1.append(feature_vector)
-                        else:
-                            feature_vectors_2.append(feature_vector)
-
-            self.target_feature_vectors.append(feature_vectors_1)
-            self.optimized_solutions_feature_vectors.append(feature_vectors_2)
-
-            fv1_mean = np.mean(feature_vectors_1, axis=0)
-            fv2_mean = np.mean(feature_vectors_2, axis=0)
-
-            self.similarity.append(1 - spatial.distance.cosine(fv1_mean, fv2_mean))
-
     def __create_folder_structure(self):
         r"""Create folder structure for metaheuristic similarity analysis."""
         datetime_now = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
@@ -215,14 +278,18 @@ class MetaheuristicSimilarityAnalyzer:
         generate_optimized_targets: bool = False,
         get_info=False,
         generate_dataset=False,
+        calculate_similarity_metrics=False,
+        export=False,
     ):
         r"""Run metaheuristic similarity analysis.
 
         Args:
             target_solutions (Optional[dict[str, list[np.ndarray]]]): Target solutions. Length of the list must match `comparisons` parameter. Generated if None.
-            generate_optimized_targets (Optional[bool]): Generate target solutions by parameter tuning. Has no effect if `target_solutions` is not None.
+            generate_optimized_targets (Optional[bool]): Generate target solutions by parameter tuning. Target solutions wil be generated by uniform rng if false. Has no effect if `target_solutions` is not None.
             get_info (Optional[bool]): Generate info scheme of the metaheuristic similarity analyzer (false by default).
             generate_dataset (Optional[bool]): Generate dataset from target and optimized solutions after analysis (false by default).
+            calculate_similarity_metrics (Optional[bool]): Calculates similarity metrics from target and optimized solutions after analysis (false by default). Has no effect if `generate_dataset` is false.
+            export (Optional[bool]): Export MSA object to pkl after analysis.
         """
         if (
             self.meta_ga is None
@@ -260,6 +327,14 @@ class MetaheuristicSimilarityAnalyzer:
 
         if generate_dataset:
             self.generate_dataset_from_solutions()
+            if calculate_similarity_metrics:
+                print("Calculating similarity metrics...")
+                self.calculate_similarity_metrics()
+        if export:
+            print("Exporting .pkl file.")
+            self.export_to_pkl("msa_obj")
+
+        print("All done!")
 
     def export_to_pkl(self, filename):
         """
