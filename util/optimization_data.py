@@ -161,7 +161,7 @@ class SingleRunData:
         Returns:
             pandas.DataFrame: Metrics values throughout the run
         """
-        if len(self.pop_metrics.keys()) == 0:
+        if len(self.pop_metrics) == 0:
             for idx, population in enumerate(self.populations):
                 for metric in population.metrics_values:
                     if idx == 0:

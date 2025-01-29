@@ -1,5 +1,11 @@
 import numpy as np
 import math
+from typing import Any
+from niapy.algorithms import Algorithm
+from niapy.util.factory import (
+    _algorithm_options,
+    get_algorithm,
+)
 
 __all__ = ["random_float_with_step", "smape"]
 
@@ -26,3 +32,23 @@ def smape(first: np.ndarray, second: np.ndarray):
     return 1.0 - np.mean(
         np.abs((first - second)) / (np.abs(first) + np.abs(second) + math.ulp(0.0))
     )
+
+
+def get_algorithm_by_name(name: str | Algorithm, *args, **kwargs):
+    """Get an instance of the algorithm by name. If string it must be listed in niapy's `_algorithm_options` method.
+
+    Args:
+        name (str | Algorithm): String name of the algorithm class or the class itself.
+
+    Returns:
+        algorithm (Algorithm): An instance of the algorithm.
+    """
+
+    if not isinstance(name, str) and issubclass(name, Algorithm):
+        return name(*args, **kwargs)
+    elif isinstance(name, str) and name not in _algorithm_options():
+        raise KeyError(
+            f"Could not find algorithm by name `{name}` in the niapy library."
+        )
+    else:
+        return get_algorithm(name, *args, **kwargs)

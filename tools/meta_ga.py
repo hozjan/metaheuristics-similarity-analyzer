@@ -1,9 +1,7 @@
 from typing import Any
 from niapy.util.factory import (
     _algorithm_options,
-    _problem_options,
     get_algorithm,
-    get_problem,
 )
 from niapy.problems import Problem
 from niapy.algorithms import Algorithm
@@ -19,6 +17,7 @@ from tools.optimization_tools import optimization_runner
 from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTMClassifier
 import tools.problems
 from util.optimization_data import SingleRunData
+from util.helper import get_algorithm_by_name
 import shutil
 import logging
 import graphviz
@@ -55,10 +54,10 @@ class MetaGA:
         ga_keep_elitism: int,
         gene_spaces: dict[str | Algorithm, dict[str, Any]],
         pop_size: int,
+        problem: Problem,
         max_iters: int = np.inf,
         max_evals: int = np.inf,
         num_runs: int = 10,
-        problem: Problem | str = "Sphere",
         pop_diversity_metrics: list[PopDiversityMetric] = None,
         indiv_diversity_metrics: list[IndivDiversityMetric] = None,
         n_pca_components: int = 3,
@@ -88,10 +87,10 @@ class MetaGA:
             ga_keep_elitism (int): Number of solutions that are a part of the elitism of the genetic algorithm.
             gene_spaces (dict[str | Algorithm, dict[str, Any]]): Gene spaces of the solution.
             pop_size (int): Population size of the metaheuristics being optimized.
+            problem (Problem): Optimization problem used for optimization.
             max_iters (Optional[int]): Maximum number of iterations of the metaheuristic being optimized for each solution of the genetic algorithm.
             max_evals (Optional[int]): Maximum number of evaluations of the metaheuristic being optimized for each solution of the genetic algorithm.
             num_runs (Optional[int]): Number of runs performed by the metaheuristic being optimized for each solution of the genetic algorithm.
-            problem (Optional[Problem | str]): Optimization problem used for optimization.
             pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics calculated. Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
             indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics calculated. Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
             n_pca_components (Optional[int]): Number of PCA components to use per learning sample of the neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
@@ -173,14 +172,7 @@ class MetaGA:
         # check if all values in the provided gene spaces are correct and
         # assemble combined gene space for meta GA
         for alg_name in self.gene_spaces:
-            if not isinstance(alg_name, str) and issubclass(alg_name, Algorithm):
-                algorithm = alg_name()
-            elif alg_name not in _algorithm_options():
-                raise KeyError(
-                    f"Could not find algorithm by name `{alg_name}` in the niapy library."
-                )
-            else:
-                algorithm = get_algorithm(alg_name)
+            algorithm = get_algorithm_by_name(alg_name)
             self.__algorithms.append(algorithm.Name[1])
             for setting in self.gene_spaces[alg_name]:
                 if type(setting) is tuple:
@@ -243,10 +235,7 @@ class MetaGA:
             )
 
         # check if the provided optimization problem is correct
-        if (
-            not isinstance(self.problem, Problem)
-            and not isinstance(self.problem, tools.problems.problem.Problem)
-        ):
+        if not isinstance(self.problem, Problem):
             raise TypeError(
                 f"Provided problem type `{type(self.problem).__name__}` is not compatible."
             )
@@ -325,14 +314,7 @@ class MetaGA:
         solution_iter = 0
         algorithms = []
         for alg_name in gene_spaces:
-            if not isinstance(alg_name, str) and issubclass(alg_name, Algorithm):
-                algorithm = alg_name(population_size=pop_size)
-            elif alg_name not in _algorithm_options():
-                raise KeyError(
-                    f"Could not find algorithm by name `{alg_name}` in the niapy library."
-                )
-            else:
-                algorithm = get_algorithm(alg_name, population_size=pop_size)
+            algorithm = get_algorithm_by_name(alg_name, population_size=pop_size)
 
             for setting in gene_spaces[alg_name]:
                 if type(setting) is tuple:
@@ -778,26 +760,21 @@ class MetaGA:
                     margin="0",
                 )
                 combined_gene_space_len = 0
-                for alg_idx, algorithm in enumerate(list(self.gene_spaces.keys())):
-                    if not isinstance(algorithm, str) and issubclass(
-                        algorithm, Algorithm
-                    ):
-                        alg_name = algorithm.Name[0]
-                    elif isinstance(algorithm, str):
-                        alg_name = algorithm
+                for alg_idx, alg_name in enumerate(list(self.gene_spaces)):
+                    algorithm = get_algorithm_by_name(alg_name)
 
                     node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
                         <tr>
-                            <td colspan="2"><b>{alg_name}</b></td>
+                            <td colspan="2"><b>{algorithm.Name[1]}</b></td>
                         </tr>
                         <tr>
                             <td>pop size</td>
                             <td>{self.pop_size}</td>
                         </tr>"""
-                    for setting in self.gene_spaces[algorithm]:
+                    for setting in self.gene_spaces[alg_name]:
                         gene = ", ".join(
                             str(value)
-                            for value in self.gene_spaces[algorithm][setting].values()
+                            for value in self.gene_spaces[alg_name][setting].values()
                         )
                         combined_gene_space_len += 1
                         node_label += f"<tr><td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td></tr>"
@@ -819,7 +796,7 @@ class MetaGA:
                 </table>>"""
                 cc.node(name=f"combined_gene_space", label=combined_gene_string)
 
-                for alg_idx in range(len(list(self.gene_spaces.keys()))):
+                for alg_idx in range(len(self.gene_spaces)):
                     cc.edge(f"gene_space_{alg_idx}", "combined_gene_space")
 
         with gv.subgraph(name="cluster_1") as c:
@@ -941,7 +918,7 @@ class MetaGA:
                         </tr>
                         <tr>
                             <td>size</td>
-                            <td>{len(list(self.gene_spaces.keys()))} * {self.num_runs}</td>
+                            <td>{len(self.gene_spaces)} * {self.num_runs}</td>
                         </tr>
                         <tr>
                             <td>train</td>
@@ -985,7 +962,7 @@ class MetaGA:
                             </tr>
                             <tr>
                                 <td>output size</td>
-                                <td>{len(list(self.gene_spaces.keys()))}</td>
+                                <td>{len(self.gene_spaces)}</td>
                             </tr>
                         </table>>""",
                     )
