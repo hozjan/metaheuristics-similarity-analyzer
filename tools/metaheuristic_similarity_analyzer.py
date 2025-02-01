@@ -1,7 +1,13 @@
 from datetime import datetime
+from logging import warning
 from pathlib import Path
+import warnings
 import os
 from typing import Any
+from pylatex import Document, Section, Subsection
+from pylatex import MultiColumn, Package, LongTable
+from pylatex.utils import bold
+from torch import Value
 from util.helper import random_float_with_step, get_algorithm_by_name
 from tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from tools.optimization_tools import optimization_runner
@@ -60,6 +66,9 @@ class MetaheuristicSimilarityAnalyzer:
         self.archive_path = ""
         self.dataset_path = ""
         self.target_alg_abbr = get_algorithm_by_name(list(target_gene_space)[0]).Name[1]
+        self.optimized_alg_abbr = get_algorithm_by_name(
+            list(self.meta_ga.gene_spaces)[0]
+        ).Name[1]
 
     def __generate_targets(self, generate_optimized_targets: bool = False):
         r"""Generate target solutions.
@@ -152,9 +161,6 @@ class MetaheuristicSimilarityAnalyzer:
         cosine_similarity = []
         spearman_r = []
 
-        al1 = self.target_alg_abbr
-        al2 = get_algorithm_by_name(list(self.meta_ga.gene_spaces)[0]).Name[1]
-
         problem = self.meta_ga.problem.name()
 
         for idx in range(len(subsets)):
@@ -163,10 +169,12 @@ class MetaheuristicSimilarityAnalyzer:
             feature_vectors_2 = []
 
             first_runs = os.listdir(
-                os.path.join(self.dataset_path, subset, al1, problem)
+                os.path.join(self.dataset_path, subset, self.target_alg_abbr, problem)
             )
             second_runs = os.listdir(
-                os.path.join(self.dataset_path, subset, al2, problem)
+                os.path.join(
+                    self.dataset_path, subset, self.optimized_alg_abbr, problem
+                )
             )
 
             first_runs.sort()
@@ -175,10 +183,10 @@ class MetaheuristicSimilarityAnalyzer:
             smape_values = []
             for fr, sr in zip(first_runs, second_runs):
                 first_run_path = os.path.join(
-                    self.dataset_path, subset, al1, problem, fr
+                    self.dataset_path, subset, self.target_alg_abbr, problem, fr
                 )
                 second_run_path = os.path.join(
-                    self.dataset_path, subset, al2, problem, sr
+                    self.dataset_path, subset, self.optimized_alg_abbr, problem, sr
                 )
                 f_srd = SingleRunData.import_from_json(first_run_path)
                 s_srd = SingleRunData.import_from_json(second_run_path)
@@ -355,6 +363,309 @@ class MetaheuristicSimilarityAnalyzer:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
         return msa
 
+    def export_results_to_latex(self, generate_pdf: bool = False):
+        r"""Generate latex file containing MSA results in form of tables.
+        Optionally also generate pdf file.
+
+        Returns:
+            generate_pdf (bool): Generates, .pdf file. Only .tex file is generated if false.
+        """
+
+        if len(self.similarity_metrics) == 0:
+            warnings.warn(
+                """Similarity metrics were not calculated and thus can not be displayed!
+                    To calculate similarity metrics call method `calculate_similarity_metrics`!"""
+            )
+
+        geometry_options = {
+            "inner": "3.5cm",
+            "outer": "2.5cm",
+            "top": "3.0cm",
+            "bottom": "3.0cm",
+        }
+        doc = Document(
+            geometry_options=geometry_options,
+            documentclass="book",
+            document_options=["openany", "a4paper", "12pt", "fleqn"],
+        )
+        doc.packages.append(Package("makecell"))
+        doc.packages.append(Package("array"))
+        doc.packages.append(Package("multirow"))
+
+        doc.append(
+            Section(
+                f"Comparison of {self.target_alg_abbr} and {self.optimized_alg_abbr}"
+            )
+        )
+        doc.append(Subsection("Comparison of hyperparameters settings"))
+
+        # Table comparing hyperparameters settings
+        hyperparameters_table = self.get_hyperparameters_latex_table()
+        doc.append(hyperparameters_table)
+
+        doc.append(Subsection("Comparison of similarity metrics"))
+
+        # Table comparing similarity metrics
+        if len(self.similarity_metrics) != 0:
+            similarity_metrics_table = self.get_similarity_metrics_latex_table()
+            doc.append(similarity_metrics_table)
+
+        doc.append(Subsection("Comparison of fitness statistics"))
+
+        # Table comparing fitness statistics
+        fitness_table = self.get_fitness_comparison_latex_table()
+        doc.append(fitness_table)
+
+        if generate_pdf:
+            doc.generate_pdf(
+                os.path.join(
+                    self.archive_path,
+                    f"{self.target_alg_abbr}_{self.optimized_alg_abbr}_MSA_results",
+                ),
+                clean_tex=False,
+            )
+        else:
+            doc.generate_tex(
+                os.path.join(
+                    self.archive_path,
+                    f"{self.target_alg_abbr}_{self.optimized_alg_abbr}_MSA_results",
+                )
+            )
+
+    def get_hyperparameters_latex_table(self):
+        r"""Create latex table displaying hyperparameters settings of target and optimized metaheuristic.
+
+        Returns:
+            hyperparameters_table (LongTable): Table displaying hyperparameters settings of both metaheuristics.
+        """
+
+        # Create table header
+        table_specs = (
+            "p{1cm} |"
+            + " c" * len(self.target_gene_space.get(list(self.target_gene_space)[0]))
+            + " |"
+            + " c"
+            * len(self.meta_ga.gene_spaces.get(list(self.meta_ga.gene_spaces)[0]))
+        )
+        hyperparameters_table = LongTable(table_specs)
+        mc_target = MultiColumn(
+            len(self.target_gene_space.get(list(self.target_gene_space)[0])),
+            align="c|",
+            data=self.target_alg_abbr,
+        )
+        mc_optimized = MultiColumn(
+            len(self.meta_ga.gene_spaces.get(list(self.meta_ga.gene_spaces)[0])),
+            data=self.optimized_alg_abbr,
+        )
+
+        hyperparameters_table.add_hline()
+        hyperparameters_table.add_row(["", mc_target, mc_optimized])
+
+        cells = ["c.n."]
+        for alg_name in self.target_gene_space:
+            for setting in self.target_gene_space[alg_name]:
+                cells.append(setting)
+        for alg_name in self.meta_ga.gene_spaces:
+            for setting in self.meta_ga.gene_spaces[alg_name]:
+                cells.append(setting)
+
+        hyperparameters_table.add_hline()
+        hyperparameters_table.add_row(cells)
+        hyperparameters_table.add_hline()
+
+        # Add rows
+        for idx, (target, optimized) in enumerate(
+            zip(self.target_solutions, self.optimized_solutions)
+        ):
+            cells = [f"{idx + 1}"]
+            for t in target:
+                cells.append(f"{round(t, 2)}")
+            for o in optimized:
+                cells.append(f"{round(o, 2)}")
+
+            hyperparameters_table.add_row(cells)
+
+        hyperparameters_table.add_hline()
+
+        # Calculate statistics at the end of the table
+        for stat in [np.min, np.mean, np.max, np.std]:
+            hyperparameters_table.add_row(
+                np.concatenate(
+                    (
+                        np.array([f"{stat.__name__}."]),
+                        np.round(stat(np.array(self.target_solutions), axis=0), 2),
+                        np.round(stat(np.array(self.optimized_solutions), axis=0), 2),
+                    )
+                )
+            )
+
+        hyperparameters_table.add_hline()
+        return hyperparameters_table
+
+    def get_similarity_metrics_latex_table(self):
+        r"""Create latex table displaying similarity metrics.
+
+        Returns:
+            similarity_metrics_table (LongTable): Table displaying similarity metrics.
+        """
+
+        if len(self.similarity_metrics) == 0:
+            raise ValueError(
+                """Similarity metrics were not calculated and thus can not be displayed!
+                    To calculate similarity metrics call method `calculate_similarity_metrics`"""
+            )
+
+        # Create table header
+        similarity_metrics_table = LongTable(
+            "*{1}{>{\centering\\arraybackslash}m{.05\paperwidth}} |"
+            + " *{1}{>{\centering\\arraybackslash}m{.09\paperwidth}}"
+            + " *{1}{>{\centering\\arraybackslash}m{.05\paperwidth}}"
+            + " *{1}{>{\centering\\arraybackslash}m{.05\paperwidth}}"
+            + " *{1}{>{\centering\\arraybackslash}m{.1\paperwidth}}"
+            + " *{1}{>{\centering\\arraybackslash}m{.1\paperwidth}}"
+        )
+        similarity_metrics_table.add_hline()
+        similarity_metrics_table.add_row(
+            (
+                "c.n.",
+                " 1-SMAPE ",
+                " cos.sim. ",
+                " rho ",
+                " 1-accuracy (SVM) ",
+                " 1-accuracy (KNN)",
+            )
+        )
+        similarity_metrics_table.add_hline()
+
+        displayed_similarity_metrics = [
+            self.similarity_metrics["smape"],
+            self.similarity_metrics["cosine"],
+            self.similarity_metrics["spearman_r"],
+            self.similarity_metrics["svm_test"],
+            self.similarity_metrics["knn_test"],
+        ]
+
+        # Add rows
+        for idx, (smape, cosine, rho, svm_test, knn_test) in enumerate(
+            zip(*displayed_similarity_metrics)
+        ):
+            row = [f"{idx + 1}"]
+            for value, list in zip(
+                [smape, cosine, rho, svm_test, knn_test],
+                displayed_similarity_metrics,
+            ):
+                if round(value, 2) == round(np.max(list), 2):
+                    row.append(bold(f"{round(value, 2)}"))
+                else:
+                    row.append(f"{round(value, 2)}")
+
+            similarity_metrics_table.add_row(row)
+
+        similarity_metrics_table.add_hline()
+
+        # Calculate statistics at the end of the table
+        for stat in (np.min, np.mean, np.max, np.std):
+            row = [f"{stat.__name__}."]
+            for list in displayed_similarity_metrics:
+                row.append(round(stat(list), 2))
+            similarity_metrics_table.add_row(row)
+
+        similarity_metrics_table.add_hline()
+        return similarity_metrics_table
+
+    def get_fitness_comparison_latex_table(self):
+        r"""Create latex table displaying statistics of fitness of target and optimized algorithm.
+
+        Returns:
+            fitness_table (LongTable): Table displaying statistics of fitness.
+        """
+        # Create table header
+        fitness_table = LongTable("p{1cm} | c  c  c | c  c  c")
+        mc_target = MultiColumn(
+            3,
+            align="c|",
+            data=self.target_alg_abbr,
+        )
+        mc_optimized = MultiColumn(
+            3,
+            data=self.optimized_alg_abbr,
+        )
+
+        fitness_table.add_hline()
+        fitness_table.add_row(["", mc_target, mc_optimized])
+
+        fitness_table.add_hline()
+        fitness_table.add_row(
+            ("c.n.", "min.", "mean.", "std.", "min.", "mean.", "std.")
+        )
+        fitness_table.add_hline()
+
+        subsets = os.listdir(self.dataset_path)
+
+        # Collect fitness data from metaheuristic optimization runs
+        fitness_statistics = []
+
+        for alg_abbr in (self.target_alg_abbr, self.optimized_alg_abbr):
+            mean_fitness = []
+            min_fitness = []
+            std_fitness = []
+            for idx in range(len(subsets)):
+                subset = f"{idx}_subset"
+                runs = os.listdir(
+                    os.path.join(
+                        self.dataset_path,
+                        subset,
+                        alg_abbr,
+                        self.meta_ga.problem.name(),
+                    )
+                )
+
+                runs.sort()
+                fitness = []
+
+                for run in runs:
+                    run_path = os.path.join(
+                        self.dataset_path,
+                        subset,
+                        alg_abbr,
+                        self.meta_ga.problem.name(),
+                        run,
+                    )
+
+                    srd = SingleRunData.import_from_json(run_path)
+                    fitness.append(srd.best_fitness)
+
+                min_fitness.append(round(np.amin(fitness), 2))
+                mean_fitness.append(round(np.mean(fitness), 2))
+                std_fitness.append(round(np.std(fitness), 2))
+
+            fitness_statistics.extend([min_fitness, mean_fitness, std_fitness])
+
+        # Add rows
+        for idx, (min_1, mean_1, std_1, min_2, mean_2, std_2) in enumerate(
+            zip(*fitness_statistics)
+        ):
+            row = [f"{idx + 1}"]
+            for value, list in zip(
+                [min_1, mean_1, std_1, min_2, mean_2, std_2], fitness_statistics
+            ):
+                if value == np.min(list):
+                    row.append(bold(f"{value}"))
+                else:
+                    row.append(f"{value}")
+            fitness_table.add_row(row)
+        fitness_table.add_hline()
+
+        # Calculate statistics at the end of the table
+        for stat in [np.min, np.mean, np.max, np.std]:
+            row = [f"{stat.__name__}."]
+            for data in fitness_statistics:
+                row.append(round(stat(data), 2))
+            fitness_table.add_row(row)
+
+        fitness_table.add_hline()
+        return fitness_table
+
     def msa_info(
         self,
         filename: str = "msa_info",
@@ -425,7 +736,7 @@ class MetaheuristicSimilarityAnalyzer:
                 )
 
                 target_parameters_len = 0
-                for alg_name in list(self.target_gene_space):
+                for alg_name in self.target_gene_space:
                     algorithm = get_algorithm_by_name(alg_name)
 
                     node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
@@ -563,9 +874,7 @@ class MetaheuristicSimilarityAnalyzer:
                     margin="0",
                 )
                 combined_gene_space_len = 0
-                for alg_idx, alg_name in enumerate(
-                    list(self.meta_ga.gene_spaces)
-                ):
+                for alg_idx, alg_name in enumerate(self.meta_ga.gene_spaces):
                     algorithm = get_algorithm_by_name(alg_name)
                     node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
                         <tr>
