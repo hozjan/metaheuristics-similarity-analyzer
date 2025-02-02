@@ -175,27 +175,10 @@ class MetaGA:
             algorithm = get_algorithm_by_name(alg_name)
             self.__algorithms.append(algorithm.Name[1])
             for setting in self.gene_spaces[alg_name]:
-                if type(setting) is tuple:
-                    for sub_setting in setting:
-                        if type(sub_setting) is tuple:
-                            if type(sub_setting[0]) not in [int, float]:
-                                raise NameError(
-                                    f"Multiplier of the {sub_setting[1]} must be a float or int, {type(sub_setting[0])} found."
-                                )
-                            if not hasattr(algorithm, sub_setting[1]):
-                                raise NameError(
-                                    f"Algorithm `{alg_name}` has no attribute named `{sub_setting[1]}`."
-                                )
-                        else:
-                            if not hasattr(algorithm, sub_setting):
-                                raise NameError(
-                                    f"Algorithm `{alg_name}` has no attribute named `{sub_setting}`."
-                                )
-                else:
-                    if not hasattr(algorithm, setting):
-                        raise NameError(
-                            f"Algorithm `{alg_name}` has no attribute named `{setting}`."
-                        )
+                if not hasattr(algorithm, setting):
+                    raise NameError(
+                        f"Algorithm `{alg_name}` has no attribute named `{setting}`."
+                    )
                 self.combined_gene_space.append(self.gene_spaces[alg_name][setting])
                 self.low_ranges.append(self.gene_spaces[alg_name][setting]["low"])
                 self.high_ranges.append(self.gene_spaces[alg_name][setting]["high"])
@@ -315,34 +298,12 @@ class MetaGA:
         algorithms = []
         for alg_name in gene_spaces:
             algorithm = get_algorithm_by_name(alg_name, population_size=pop_size)
-
             for setting in gene_spaces[alg_name]:
-                if type(setting) is tuple:
-                    for sub_setting in setting:
-                        if type(sub_setting) is tuple:
-                            if type(sub_setting[0]) not in [int, float]:
-                                raise NameError(
-                                    f"Multiplier of the {sub_setting[1]} must be a float or int, {type(sub_setting[0])} found."
-                                )
-                            if not hasattr(algorithm, sub_setting[1]):
-                                raise NameError(
-                                    f"Algorithm `{alg_name}` has no attribute named `{sub_setting[1]}`."
-                                )
-                            algorithm.__setattr__(
-                                sub_setting[1], solution[solution_iter] * sub_setting[0]
-                            )
-                        else:
-                            if not hasattr(algorithm, sub_setting):
-                                raise NameError(
-                                    f"Algorithm `{alg_name}` has no attribute named `{sub_setting}`."
-                                )
-                            algorithm.__setattr__(sub_setting, solution[solution_iter])
-                else:
-                    if not hasattr(algorithm, setting):
-                        raise NameError(
-                            f"Algorithm `{alg_name}` has no attribute named `{setting}`."
-                        )
-                    algorithm.__setattr__(setting, solution[solution_iter])
+                if not hasattr(algorithm, setting):
+                    raise NameError(
+                        f"Algorithm `{alg_name}` has no attribute named `{setting}`."
+                    )
+                algorithm.__setattr__(setting, solution[solution_iter])
                 solution_iter += 1
             algorithms.append(algorithm)
         return algorithms

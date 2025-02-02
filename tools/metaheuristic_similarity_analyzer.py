@@ -83,27 +83,10 @@ class MetaheuristicSimilarityAnalyzer:
         for alg_name in self.target_gene_space:
             algorithm = get_algorithm_by_name(alg_name)
             for setting in self.target_gene_space[alg_name]:
-                if type(setting) is tuple:
-                    for sub_setting in setting:
-                        if type(sub_setting) is tuple:
-                            if type(sub_setting[0]) not in [int, float]:
-                                raise NameError(
-                                    f"Multiplier of the {sub_setting[1]} must be a float or int, {type(sub_setting[0])} found."
-                                )
-                            if not hasattr(algorithm, sub_setting[1]):
-                                raise NameError(
-                                    f"Algorithm `{alg_name}` has no attribute named `{sub_setting[1]}`."
-                                )
-                        else:
-                            if not hasattr(algorithm, sub_setting):
-                                raise NameError(
-                                    f"Algorithm `{alg_name}` has no attribute named `{sub_setting}`."
-                                )
-                else:
-                    if not hasattr(algorithm, setting):
-                        raise NameError(
-                            f"Algorithm `{alg_name}` has no attribute named `{setting}`."
-                        )
+                if not hasattr(algorithm, setting):
+                    raise NameError(
+                        f"Algorithm `{alg_name}` has no attribute named `{setting}`."
+                    )
                 low_ranges.append(self.target_gene_space[alg_name][setting]["low"])
                 high_ranges.append(self.target_gene_space[alg_name][setting]["high"])
                 steps.append(self.target_gene_space[alg_name][setting]["step"])
