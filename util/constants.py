@@ -1,9 +1,6 @@
 from util.indiv_diversity_metrics import IndivDiversityMetric
 from util.pop_diversity_metrics import PopDiversityMetric
 from tools.problems.schwefel import Schwefel
-from tools.algorithms.fa import FireflyAlgorithm
-from tools.algorithms.pso import ParticleSwarmAlgorithm
-import numpy as np
 
 
 RNG_SEED = 42
@@ -62,7 +59,7 @@ META_GA_MUTATION_NUM_GENES = 1
 META_GA_MUTATION_TYPE = "random"
 META_GA_KEEP_ELITISM = 1
 
-# problem, algorithm and parameter names must match those from the niapy library
+# problem, algorithm and parameter names must match those from the niapy framework
 OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
 """
 GENE_SPACES = {

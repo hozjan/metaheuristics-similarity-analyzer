@@ -1,80 +1,91 @@
 from datetime import datetime
-from logging import warning
 from pathlib import Path
 import warnings
 import os
-from typing import Any
 from pylatex import Document, Section, Subsection
 from pylatex import MultiColumn, Package, LongTable
 from pylatex.utils import bold
-from torch import Value
 from util.helper import random_float_with_step, get_algorithm_by_name
 from tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from tools.optimization_tools import optimization_runner
 from tools.ml_tools import svm_and_knn_classification
 from util.optimization_data import SingleRunData
 import numpy as np
+import numpy.typing as npt
 from scipy import spatial, stats
 import graphviz
 import cloudpickle
 from niapy.algorithms import Algorithm
-from niapy.problems import Problem
-from niapy.util.factory import (
-    _algorithm_options,
-    get_algorithm,
-)
+
+__all__ = ["MetaheuristicSimilarityAnalyzer"]
 
 
 class MetaheuristicSimilarityAnalyzer:
-    r"""Class for search and analysis of similarity of metaheuristic with different parameter settings.
-    Uses target metaheuristic with stochastically selected parameters and aims to find parameters of the
-    optimized metaheuristic with which they perform in a similar maner."""
+    r"""Class for search and analysis of similarity of metaheuristic with
+    different parameter settings. Uses target metaheuristic with stochastically
+    selected parameters and aims to find parameters of the optimized
+    metaheuristic with which they perform in a similar maner.
+    """
 
     def __init__(
         self,
-        meta_ga: MetaGA = None,
-        target_gene_space: dict[str | Algorithm, dict[str, Any]] = None,
-        comparisons: int = 0,
+        meta_ga: MetaGA,
+        target_gene_space: dict[str | Algorithm, dict[str, dict[str, float]]],
+        base_archive_path: str = "archive"
     ) -> None:
         r"""Initialize the metaheuristic similarity analyzer.
 
         Args:
-            meta_ga (Optional[MetaGA]): Preconfigured instance of the meta genetic algorithm with fitness function set to `TARGET_PERFORMANCE_SIMILARITY`.
-            target_gene_space (Optional[dict[str | Algorithm, dict[str, Any]]]): Gene space of the reference metaheuristic.
-            comparisons (Optional[int]): Number of metaheuristic parameter combinations to analyze during the similarity analysis.
+            meta_ga (Optional[MetaGA]): Preconfigured instance of the meta
+                genetic algorithm with fitness function set to
+                `TARGET_PERFORMANCE_SIMILARITY`.
+            target_gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]):
+                Gene space of the reference metaheuristic.
+            base_archive_path (Optional[str]): Base archive path of the MSA. Used for dataset location.
+
+        Raises:
+            ValueError: Incorrect `fitness_function_type` value assigned to meta_ga.
+            ValueError: Incorrect number of gene space in `target_gene_space`.
         """
+
         if (
-            not (meta_ga is None)
-            and meta_ga.fitness_function_type
-            != MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
+            meta_ga is not None
+            and meta_ga.fitness_function_type != MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
         ):
             raise ValueError(
-                "Fitness function of the `meta_ga` must be set to `TARGET_PERFORMANCE_SIMILARITY`."
+                """`fitness_function_type` of the `meta_ga` must be set to
+                `TARGET_PERFORMANCE_SIMILARITY`."""
             )
 
         if len(target_gene_space) != 1:
             raise ValueError(
-                "Only one algorithm must be defined in `target_gene_space` provided."
+                """Only one algorithm must be defined in `target_gene_space`
+                provided."""
             )
 
         self.meta_ga = meta_ga
         self.target_gene_space = target_gene_space
-        self.comparisons = comparisons
-        self.target_solutions = []
-        self.optimized_solutions = []
-        self.similarity_metrics = {}
+        self.target_solutions: list[npt.NDArray] = []
+        self.optimized_solutions: list[list[float]] = []
+        self.similarity_metrics: dict[str, list[float]] = {}
         self.archive_path = ""
         self.dataset_path = ""
         self.target_alg_abbr = get_algorithm_by_name(list(target_gene_space)[0]).Name[1]
-        self.optimized_alg_abbr = get_algorithm_by_name(
-            list(self.meta_ga.gene_spaces)[0]
-        ).Name[1]
+        self.optimized_alg_abbr = get_algorithm_by_name(list(self.meta_ga.gene_spaces)[0]).Name[1]
+        self._base_archive_path = base_archive_path
 
-    def __generate_targets(self, generate_optimized_targets: bool = False):
+    def __generate_targets(self, num_comparisons: int, generate_optimized_targets: bool = False):
         r"""Generate target solutions.
 
         Args:
-            generate_optimized_targets (Optional[bool]): Generate target solutions by parameter tuning if True, otherwise generate random targets.
+            generate_optimized_targets (Optional[bool]): Generate target
+                solutions by parameter tuning if True, otherwise generate
+                random targets.
+            num_comparisons (Optional[int]): Number of metaheuristic parameter
+                combinations to analyze during the similarity analysis.
+
+        Raises:
+            ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
         """
         low_ranges = []
         high_ranges = []
@@ -84,16 +95,14 @@ class MetaheuristicSimilarityAnalyzer:
             algorithm = get_algorithm_by_name(alg_name)
             for setting in self.target_gene_space[alg_name]:
                 if not hasattr(algorithm, setting):
-                    raise NameError(
-                        f"Algorithm `{alg_name}` has no attribute named `{setting}`."
-                    )
+                    raise NameError(f"Algorithm `{alg_name}` has no attribute named `{setting}`.")
                 low_ranges.append(self.target_gene_space[alg_name][setting]["low"])
                 high_ranges.append(self.target_gene_space[alg_name][setting]["high"])
                 steps.append(self.target_gene_space[alg_name][setting]["step"])
 
         self.__create_folder_structure()
 
-        for idx in range(self.comparisons):
+        for idx in range(num_comparisons):
             if generate_optimized_targets:
                 meta_ga = MetaGA(
                     fitness_function_type=MetaGAFitnessFunction.PARAMETER_TUNING,
@@ -114,28 +123,27 @@ class MetaheuristicSimilarityAnalyzer:
                     problem=self.meta_ga.problem,
                     base_archive_path=os.path.join(self.archive_path, "target_tuning"),
                 )
-                target_solution = meta_ga.run_meta_ga(
-                    prefix=str(idx), return_best_solution=True
-                )
-                self.target_solutions.append(target_solution)
+                target_solution = meta_ga.run_meta_ga(prefix=str(idx), return_best_solution=True)
+                if target_solution is not None:
+                    self.target_solutions.append(target_solution)
             else:
                 target_solution = []
                 for low, high, step in zip(low_ranges, high_ranges, steps):
-                    target_solution.append(
-                        random_float_with_step(low=low, high=high, step=step)
-                    )
+                    target_solution.append(random_float_with_step(low=low, high=high, step=step))
                 self.target_solutions.append(np.array(target_solution))
 
     def calculate_similarity_metrics(self):
-        r"""Calculates similarity metrics from diversity metrics values of the comparisons stored in the generated dataset.
+        r"""Calculates similarity metrics from diversity metrics
+        values of the comparisons stored in the generated dataset.
         If no dataset was created method will have no effect.
+
+        Raises:
+            FileNotFoundError: No dataset found.
         """
 
-        if os.path.exists(self.dataset_path) == False:
-            raise (
-                ValueError(
-                    "Dataset does not exist. Run `generate_dataset_from_solutions` to generate dataset!"
-                )
+        if os.path.exists(self.dataset_path) is False:
+            raise FileNotFoundError(
+                "Dataset does not exist. Run `generate_dataset_from_solutions` to generate dataset!"
             )
 
         subsets = os.listdir(self.dataset_path)
@@ -151,12 +159,13 @@ class MetaheuristicSimilarityAnalyzer:
             feature_vectors_1 = []
             feature_vectors_2 = []
 
-            first_runs = os.listdir(
-                os.path.join(self.dataset_path, subset, self.target_alg_abbr, problem)
-            )
+            first_runs = os.listdir(os.path.join(self.dataset_path, subset, self.target_alg_abbr, problem))
             second_runs = os.listdir(
                 os.path.join(
-                    self.dataset_path, subset, self.optimized_alg_abbr, problem
+                    self.dataset_path,
+                    subset,
+                    self.optimized_alg_abbr,
+                    problem,
                 )
             )
 
@@ -166,10 +175,18 @@ class MetaheuristicSimilarityAnalyzer:
             smape_values = []
             for fr, sr in zip(first_runs, second_runs):
                 first_run_path = os.path.join(
-                    self.dataset_path, subset, self.target_alg_abbr, problem, fr
+                    self.dataset_path,
+                    subset,
+                    self.target_alg_abbr,
+                    problem,
+                    fr,
                 )
                 second_run_path = os.path.join(
-                    self.dataset_path, subset, self.optimized_alg_abbr, problem, sr
+                    self.dataset_path,
+                    subset,
+                    self.optimized_alg_abbr,
+                    problem,
+                    sr,
                 )
                 f_srd = SingleRunData.import_from_json(first_run_path)
                 s_srd = SingleRunData.import_from_json(second_run_path)
@@ -201,26 +218,26 @@ class MetaheuristicSimilarityAnalyzer:
         self.similarity_metrics["spearman_r"] = spearman_r
         self.similarity_metrics.update(ml_accuracy)
 
-    def generate_dataset_from_solutions(self, num_runs: int = None):
+    def generate_dataset_from_solutions(self, num_runs: int | None = None):
         r"""Generate dataset from target and optimized solutions.
 
         Args:
-            num_runs (Optional[int]): Number of runs performed by the metaheuristic for each solution. if None value assigned to meta genetic algorithm is used.
+            num_runs (Optional[int]): Number of runs performed by the
+                metaheuristic for each solution. if None value assigned
+                to meta genetic algorithm is used.
         """
         if num_runs is None:
             num_runs = self.meta_ga.num_runs
 
-        for idx, (solution_0, solution_1) in enumerate(
-            zip(self.target_solutions, self.optimized_solutions)
-        ):
+        for idx, (solution_0, solution_1) in enumerate(zip(self.target_solutions, self.optimized_solutions)):
             _subset_path = os.path.join(self.dataset_path, f"{idx}_subset")
-            if os.path.exists(_subset_path) == False:
+            if os.path.exists(_subset_path) is False:
                 Path(_subset_path).mkdir(parents=True, exist_ok=True)
 
             solution = np.append(solution_0, solution_1)
             gene_spaces = self.target_gene_space | self.meta_ga.gene_spaces
             algorithms = MetaGA.solution_to_algorithm_attributes(
-                solution=solution.tolist(),
+                solution=solution,
                 gene_spaces=gene_spaces,
                 pop_size=self.meta_ga.pop_size,
             )
@@ -242,44 +259,71 @@ class MetaheuristicSimilarityAnalyzer:
         r"""Create folder structure for metaheuristic similarity analysis."""
         datetime_now = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
         self.archive_path = os.path.join(
-            "archive/target_performance_similarity",
-            "_".join([datetime_now, self.target_alg_abbr, self.meta_ga.problem.name()]),
+            self._base_archive_path,
+            "_".join(
+                [
+                    datetime_now,
+                    self.target_alg_abbr,
+                    self.meta_ga.problem.name(),
+                ]
+            ),
         )
         self.dataset_path = os.path.join(self.archive_path, "dataset")
-        if os.path.exists(self.archive_path) == False:
+        if os.path.exists(self.archive_path) is False:
             Path(self.archive_path).mkdir(parents=True, exist_ok=True)
 
     def run_similarity_analysis(
         self,
-        target_solutions: dict[str, list[np.ndarray]] = None,
+        num_comparisons: int | None = None,
+        target_solutions: list[npt.NDArray] | None = None,
         generate_optimized_targets: bool = False,
-        get_info=False,
-        generate_dataset=False,
-        calculate_similarity_metrics=False,
-        export=False,
+        get_info: bool = False,
+        generate_dataset: bool = False,
+        calculate_similarity_metrics: bool = False,
+        export: bool = False,
     ):
         r"""Run metaheuristic similarity analysis.
 
         Args:
-            target_solutions (Optional[list[np.ndarray]]): Target solutions for the target algorithm. Length of the list must match `comparisons` parameter. Generated if None.
-            generate_optimized_targets (Optional[bool]): Generate target solutions by parameter tuning. Target solutions wil be generated by uniform rng if false. Has no effect if `target_solutions` is not None.
-            get_info (Optional[bool]): Generate info scheme of the metaheuristic similarity analyzer (false by default).
-            generate_dataset (Optional[bool]): Generate dataset from target and optimized solutions after analysis (false by default).
-            calculate_similarity_metrics (Optional[bool]): Calculates similarity metrics from target and optimized solutions after analysis (false by default). Has no effect if `generate_dataset` is false.
+            num_comparisons (Optional[int]): Number of metaheuristic parameter
+                combinations to analyze during the similarity analysis.
+                Required if `target_solutions` is None.
+            target_solutions (Optional[list[numpy.ndarray]]): Target solutions
+                for the target algorithm. Generated if None.
+            generate_optimized_targets (Optional[bool]): Generate target
+                solutions by parameter tuning. Target solutions wil be
+                generated by uniform rng if false. Has no effect if
+                `target_solutions` is not None.
+            get_info (Optional[bool]): Generate info scheme of the
+                metaheuristic similarity analyzer (false by default).
+            generate_dataset (Optional[bool]): Generate dataset from
+                target and optimized solutions after analysis
+                (false by default).
+            calculate_similarity_metrics (Optional[bool]): Calculates
+                similarity metrics from target and optimized solutions
+                after analysis (false by default). Has no effect if
+                `generate_dataset` is false.
             export (Optional[bool]): Export MSA object to pkl after analysis.
+
+        Raises:
+            ValueError: `meta_ga` not defined or `fitness_function_type`
+                has incorrect value.
         """
         if (
             self.meta_ga is None
-            or self.meta_ga.fitness_function_type
-            != MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
+            or self.meta_ga.fitness_function_type != MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
         ):
             raise ValueError(
-                "The `meta_ga` parameter must be defined and the fitness function must be set to `TARGET_PERFORMANCE_SIMILARITY`."
+                """The `meta_ga` parameter must be defined and the fitness
+                function must be set to `TARGET_PERFORMANCE_SIMILARITY`."""
             )
 
-        if target_solutions is None:
-            self.__generate_targets(generate_optimized_targets)
-        else:
+        if target_solutions is None and num_comparisons is None:
+            raise ValueError("""None of the `num_comparisons` or `target_solutions` was defined!""")
+
+        if target_solutions is None and num_comparisons is not None:
+            self.__generate_targets(num_comparisons, generate_optimized_targets)
+        elif target_solutions is not None:
             self.target_solutions = target_solutions
             self.__create_folder_structure()
 
@@ -296,10 +340,9 @@ class MetaheuristicSimilarityAnalyzer:
                 gene_spaces=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
-            self.meta_ga.run_meta_ga(
-                target_algorithm=target_algorithm[0], prefix=str(idx)
-            )
-            self.optimized_solutions.append(self.meta_ga.meta_ga.best_solutions[-1])
+            self.meta_ga.run_meta_ga(target_algorithm=target_algorithm[0], prefix=str(idx))
+            if self.meta_ga.meta_ga is not None:
+                self.optimized_solutions.append(self.meta_ga.meta_ga.best_solutions[-1])
 
         if generate_dataset:
             self.generate_dataset_from_solutions()
@@ -335,6 +378,10 @@ class MetaheuristicSimilarityAnalyzer:
 
         Returns:
             msa (MetaheuristicSimilarityAnalyzer): Metaheuristic similarity analyzer instance.
+
+        Raises:
+            FileNotFoundError: File not found.
+            BaseException: File could not be loaded.
         """
 
         try:
@@ -342,7 +389,7 @@ class MetaheuristicSimilarityAnalyzer:
                 msa = cloudpickle.load(file)
         except FileNotFoundError:
             raise FileNotFoundError(f"File {filename}.pkl not found.")
-        except:
+        except Exception:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
         return msa
 
@@ -375,11 +422,7 @@ class MetaheuristicSimilarityAnalyzer:
         doc.packages.append(Package("array"))
         doc.packages.append(Package("multirow"))
 
-        doc.append(
-            Section(
-                f"Comparison of {self.target_alg_abbr} and {self.optimized_alg_abbr}"
-            )
-        )
+        doc.append(Section(f"Comparison of {self.target_alg_abbr} and {self.optimized_alg_abbr}"))
         doc.append(Subsection("Comparison of hyperparameters settings"))
 
         # Table comparing hyperparameters settings
@@ -425,19 +468,18 @@ class MetaheuristicSimilarityAnalyzer:
         # Create table header
         table_specs = (
             "p{1cm} |"
-            + " c" * len(self.target_gene_space.get(list(self.target_gene_space)[0]))
+            + " c" * len(self.target_gene_space[next(iter(self.target_gene_space))])
             + " |"
-            + " c"
-            * len(self.meta_ga.gene_spaces.get(list(self.meta_ga.gene_spaces)[0]))
+            + " c" * len(self.meta_ga.gene_spaces[next(iter(self.meta_ga.gene_spaces))])
         )
         hyperparameters_table = LongTable(table_specs)
         mc_target = MultiColumn(
-            len(self.target_gene_space.get(list(self.target_gene_space)[0])),
+            len(self.target_gene_space[next(iter(self.target_gene_space))]),
             align="c|",
             data=self.target_alg_abbr,
         )
         mc_optimized = MultiColumn(
-            len(self.meta_ga.gene_spaces.get(list(self.meta_ga.gene_spaces)[0])),
+            len(self.meta_ga.gene_spaces[next(iter(self.meta_ga.gene_spaces))]),
             data=self.optimized_alg_abbr,
         )
 
@@ -457,9 +499,7 @@ class MetaheuristicSimilarityAnalyzer:
         hyperparameters_table.add_hline()
 
         # Add rows
-        for idx, (target, optimized) in enumerate(
-            zip(self.target_solutions, self.optimized_solutions)
-        ):
+        for idx, (target, optimized) in enumerate(zip(self.target_solutions, self.optimized_solutions)):
             cells = [f"{idx + 1}"]
             for t in target:
                 cells.append(f"{round(t, 2)}")
@@ -477,7 +517,10 @@ class MetaheuristicSimilarityAnalyzer:
                     (
                         np.array([f"{stat.__name__}."]),
                         np.round(stat(np.array(self.target_solutions), axis=0), 2),
-                        np.round(stat(np.array(self.optimized_solutions), axis=0), 2),
+                        np.round(
+                            stat(np.array(self.optimized_solutions), axis=0),
+                            2,
+                        ),
                     )
                 )
             )
@@ -490,6 +533,9 @@ class MetaheuristicSimilarityAnalyzer:
 
         Returns:
             similarity_metrics_table (LongTable): Table displaying similarity metrics.
+
+        Raises:
+            ValueError: Similarity metrics were not calculated and thus can not be displayed.
         """
 
         if len(self.similarity_metrics) == 0:
@@ -529,9 +575,7 @@ class MetaheuristicSimilarityAnalyzer:
         ]
 
         # Add rows
-        for idx, (smape, cosine, rho, svm_test, knn_test) in enumerate(
-            zip(*displayed_similarity_metrics)
-        ):
+        for idx, (smape, cosine, rho, svm_test, knn_test) in enumerate(zip(*displayed_similarity_metrics)):
             row = [f"{idx + 1}"]
             for value, list in zip(
                 [smape, cosine, rho, svm_test, knn_test],
@@ -578,9 +622,7 @@ class MetaheuristicSimilarityAnalyzer:
         fitness_table.add_row(["", mc_target, mc_optimized])
 
         fitness_table.add_hline()
-        fitness_table.add_row(
-            ("c.n.", "min.", "mean.", "std.", "min.", "mean.", "std.")
-        )
+        fitness_table.add_row(("c.n.", "min.", "mean.", "std.", "min.", "mean.", "std."))
         fitness_table.add_hline()
 
         subsets = os.listdir(self.dataset_path)
@@ -625,12 +667,11 @@ class MetaheuristicSimilarityAnalyzer:
             fitness_statistics.extend([min_fitness, mean_fitness, std_fitness])
 
         # Add rows
-        for idx, (min_1, mean_1, std_1, min_2, mean_2, std_2) in enumerate(
-            zip(*fitness_statistics)
-        ):
+        for idx, (min_1, mean_1, std_1, min_2, mean_2, std_2) in enumerate(zip(*fitness_statistics)):
             row = [f"{idx + 1}"]
             for value, list in zip(
-                [min_1, mean_1, std_1, min_2, mean_2, std_2], fitness_statistics
+                [min_1, mean_1, std_1, min_2, mean_2, std_2],
+                fitness_statistics,
             ):
                 if value == np.min(list):
                     row.append(bold(f"{value}"))
@@ -694,7 +735,7 @@ class MetaheuristicSimilarityAnalyzer:
                     </tr>
                     <tr>
                         <td>target solutions</td>
-                        <td>{self.comparisons}</td>
+                        <td>{len(self.target_solutions)}</td>
                     </tr>
                     <tr>
                         <td>runs per solutions</td>
@@ -731,16 +772,11 @@ class MetaheuristicSimilarityAnalyzer:
                             <td>{self.meta_ga.pop_size}</td>
                         </tr>"""
                     for setting in self.target_gene_space[alg_name]:
-                        gene = ", ".join(
-                            str(value)
-                            for value in self.target_gene_space[alg_name][
-                                setting
-                            ].values()
-                        )
+                        gene = ", ".join(str(value) for value in self.target_gene_space[alg_name][setting].values())
                         node_label += f"<tr><td>{setting}</td><td>[{gene}]</td></tr>"
                         target_parameters_len += 1
                     node_label += "</table>>"
-                    cc.node(name=f"target_gene_space", label=node_label)
+                    cc.node(name="target_gene_space", label=node_label)
 
                 target_parameters = f"""<
                     <table border="0" cellborder="1" cellspacing="0">
@@ -753,7 +789,7 @@ class MetaheuristicSimilarityAnalyzer:
                             <td>p<i><sub>{target_parameters_len}</sub></i></td>
                         </tr>
                     </table>>"""
-                cc.node(name=f"target_parameters", label=target_parameters)
+                cc.node(name="target_parameters", label=target_parameters)
 
                 cc.edge(
                     "target_gene_space",
@@ -762,7 +798,12 @@ class MetaheuristicSimilarityAnalyzer:
                 )
 
         with gv.subgraph(name="cluster_1") as c:
-            c.attr(style="filled", color=graph_color, name="meta_ga", label="Meta GA")
+            c.attr(
+                style="filled",
+                color=graph_color,
+                name="meta_ga",
+                label="Meta GA",
+            )
             c.node_attr.update(
                 style="filled",
                 color=table_border_color,
@@ -868,14 +909,11 @@ class MetaheuristicSimilarityAnalyzer:
                             <td>{self.meta_ga.pop_size}</td>
                         </tr>"""
                     for setting in self.meta_ga.gene_spaces[alg_name]:
-                        gene = ", ".join(
-                            str(value)
-                            for value in self.meta_ga.gene_spaces[alg_name][
-                                setting
-                            ].values()
-                        )
+                        gene = ", ".join(str(value) for value in self.meta_ga.gene_spaces[alg_name][setting].values())
                         combined_gene_space_len += 1
-                        node_label += f"<tr><td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td></tr>"
+                        node_label += (
+                            f"<tr><td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td></tr>"
+                        )
                     node_label += "</table>>"
                     cc.node(name=f"gene_space_{alg_idx}", label=node_label)
 
@@ -892,12 +930,12 @@ class MetaheuristicSimilarityAnalyzer:
                         <td port="gene_fitness">?</td>
                     </tr>
                 </table>>"""
-                cc.node(name=f"combined_gene_space", label=combined_gene_string)
+                cc.node(name="combined_gene_space", label=combined_gene_string)
 
                 for alg_idx in range(len(self.meta_ga.gene_spaces)):
                     cc.edge(f"gene_space_{alg_idx}", "combined_gene_space")
 
-            c.edge(f"cosine_similarity", "combined_gene_space:gene_fitness")
+            c.edge("cosine_similarity", "combined_gene_space:gene_fitness")
 
         with gv.subgraph(name="cluster_2") as c:
             c.attr(
@@ -953,17 +991,23 @@ class MetaheuristicSimilarityAnalyzer:
                     shape="plaintext",
                     margin="0",
                 )
-                pop_metrics_label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Pop Metrics</b></td></tr>'
-                for metric in self.meta_ga.pop_diversity_metrics:
-                    pop_metrics_label += f"""<tr><td>{metric.value}</td></tr>"""
+                pop_metrics_label = (
+                    '<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Pop Metrics</b></td></tr>'
+                )
+                if self.meta_ga.pop_diversity_metrics is not None:
+                    for pop_metric in self.meta_ga.pop_diversity_metrics:
+                        pop_metrics_label += f"""<tr><td>{pop_metric.value}</td></tr>"""
                 pop_metrics_label += "</table>>"
-                cc.node(name=f"pop_metrics", label=pop_metrics_label)
+                cc.node(name="pop_metrics", label=pop_metrics_label)
 
-                indiv_metrics_label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Indiv Metrics</b></td></tr>'
-                for metric in self.meta_ga.indiv_diversity_metrics:
-                    indiv_metrics_label += f"""<tr><td>{metric.value}</td></tr>"""
+                indiv_metrics_label = (
+                    '<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Indiv Metrics</b></td></tr>'
+                )
+                if self.meta_ga.indiv_diversity_metrics is not None:
+                    for indiv_metric in self.meta_ga.indiv_diversity_metrics:
+                        indiv_metrics_label += f"""<tr><td>{indiv_metric.value}</td></tr>"""
                 indiv_metrics_label += "</table>>"
-                cc.node(name=f"indiv_metrics", label=indiv_metrics_label)
+                cc.node(name="indiv_metrics", label=indiv_metrics_label)
 
         with gv.subgraph(name="cluster_3") as c:
             c.attr(
@@ -980,6 +1024,9 @@ class MetaheuristicSimilarityAnalyzer:
                 margin="0",
             )
 
+            pop_size = self.meta_ga.pop_size
+            max_iters = self.meta_ga.max_iters
+
             c.node(
                 name="pop_scheme",
                 label=f"""<
@@ -990,7 +1037,7 @@ class MetaheuristicSimilarityAnalyzer:
                                 <tr>
                                     <td><i><b>X</b><sub>i=1, t=1</sub></i></td>
                                     <td>...</td>
-                                    <td><i><b>X</b><sub>i=1, t={self.meta_ga.max_iters}</sub></i></td>
+                                    <td><i><b>X</b><sub>i=1, t={max_iters}</sub></i></td>
                                 </tr>
                                 <tr>
                                     <td>...</td>
@@ -998,9 +1045,9 @@ class MetaheuristicSimilarityAnalyzer:
                                     <td>...</td>
                                 </tr>
                                 <tr>
-                                    <td><i><b>X</b><sub>i={self.meta_ga.pop_size}, t=1</sub></i></td>
+                                    <td><i><b>X</b><sub>i={pop_size}, t=1</sub></i></td>
                                     <td>...</td>
-                                    <td><i><b>X</b><sub>i={self.meta_ga.pop_size}, t={self.meta_ga.max_iters}</sub></i></td>
+                                    <td><i><b>X</b><sub>i={pop_size}, t={max_iters}</sub></i></td>
                                 </tr>
                             </table>
                         </td>
@@ -1013,7 +1060,7 @@ class MetaheuristicSimilarityAnalyzer:
                                     <td>...</td>
                                 </tr>
                                 <tr>
-                                    <td><i><b>IM</b><sub>{self.meta_ga.pop_size}</sub></i></td>
+                                    <td><i><b>IM</b><sub>{pop_size}</sub></i></td>
                                 </tr>
                             </table>
                         </td>
@@ -1024,7 +1071,7 @@ class MetaheuristicSimilarityAnalyzer:
                                 <tr>
                                     <td><i><b>PM</b><sub>1</sub></i></td>
                                     <td>...</td>
-                                    <td><i><b>PM</b><sub>{self.meta_ga.max_iters}</sub></i></td>
+                                    <td><i><b>PM</b><sub>{max_iters}</sub></i></td>
                                 </tr>
                             </table>
                         </td>
@@ -1037,7 +1084,7 @@ class MetaheuristicSimilarityAnalyzer:
             minlen="3",
             tail_name="combined_gene_space",
             head_name="pop_metrics",
-            xlabel=f"for each \nsolution",
+            xlabel="for each \nsolution",
             lhead="cluster_2",
         )
         gv.edge(

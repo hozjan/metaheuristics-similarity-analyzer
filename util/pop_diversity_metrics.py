@@ -1,11 +1,12 @@
 import numpy as np
+import numpy.typing as npt
 import math
 from enum import Enum
 from niapy.problems import Problem
 from niapy.util.distances import euclidean
 import itertools
 
-__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFM"]
+__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFM", "PopDiversityMetric"]
 
 
 class PopDiversityMetric(Enum):
@@ -19,7 +20,7 @@ class PopDiversityMetric(Enum):
     PFM = "PFM"
 
 
-def PDC(population, problem: Problem):
+def PDC(population: npt.NDArray, problem: Problem):
     r"""Distance to Population Centroid.
 
     Reference paper:
@@ -39,15 +40,13 @@ def PDC(population, problem: Problem):
 
     avg_point = np.mean(population, axis=0)
 
-    distances = np.linalg.norm(
-        population - list(itertools.repeat(avg_point, P)), axis=1
-    )
+    distances = np.linalg.norm(population - list(itertools.repeat(avg_point, P)), axis=1)
     pdc = np.sum(distances, axis=0)
 
     return pdc / (P * L)
 
 
-def PED(population):
+def PED(population: npt.NDArray):
     r"""Population Euclidean Distance.
 
     Args:
@@ -60,12 +59,12 @@ def PED(population):
     ped = 0
 
     for index_i, pi in enumerate(population):
-        for pj in population[index_i + 1 :]:
+        for pj in population[index_i + 1:]:
             ped += euclidean(pi, pj)
     return ped
 
 
-def PMD(population):
+def PMD(population: npt.NDArray):
     r"""Population Manhattan Distance.
 
     Args:
@@ -78,7 +77,7 @@ def PMD(population):
     pmd = 0
 
     for index_i, pi in enumerate(population):
-        for pj in population[index_i + 1 :]:
+        for pj in population[index_i + 1:]:
             sum = 0
             for xi, xj in zip(pi, pj):
                 sum += abs(xi - xj)
@@ -87,11 +86,12 @@ def PMD(population):
     return pmd
 
 
-def AAD(population):
+def AAD(population: npt.NDArray):
     r"""Average of the Average Distance around all Particles in the Swarm.
 
     Reference paper:
-        O. Olorunda and A. P. Engelbrecht, "Measuring exploration/exploitation in particle swarms using swarm diversity," China, 2008, pp. 1128-1134, doi: 10.1109/CEC.2008.4630938.
+        O. Olorunda and A. P. Engelbrecht, "Measuring exploration/exploitation in particle swarms using swarm
+        diversity," China, 2008, pp. 1128-1134, doi: 10.1109/CEC.2008.4630938.
 
     Args:
         population (numpy.ndarray): population.
@@ -101,10 +101,10 @@ def AAD(population):
 
     """
     P, N = np.shape(population)
-    aad = 0
+    aad = 0.0
 
     for pi in population:
-        ad = 0
+        ad = 0.0
         for p in population:
             ad += euclidean(p, pi)
         aad += ad / P
@@ -112,11 +112,12 @@ def AAD(population):
     return aad / P
 
 
-def PDI(population, problem: Problem, epsilon=0.001):
+def PDI(population: npt.NDArray, problem: Problem, epsilon=0.001):
     r"""Population Diversity Index.
 
     Reference paper:
-        Smit, S.K. & Szlávik, Zoltán & Eiben, A.. (2011). Population diversity index: A new measure for population diversity. 269-270. 10.1145/2001858.2002010.
+        Smit, S.K. & Szlávik, Zoltán & Eiben, A.. (2011). Population diversity index:
+        A new measure for population diversity. 269-270. 10.1145/2001858.2002010.
 
     Args:
         population (numpy.ndarray): population.
@@ -141,15 +142,13 @@ def PDI(population, problem: Problem, epsilon=0.001):
     # normalizing values to [0, 1]
     for pi in range(m):
         for xi in range(n):
-            _population[pi][xi] = (_population[pi][xi] - problem.lower[xi]) / (
-                problem.upper[xi] - problem.lower[xi]
-            )
+            _population[pi][xi] = (_population[pi][xi] - problem.lower[xi]) / (problem.upper[xi] - problem.lower[xi])
 
     # calculate numerator part of the pdi equation
-    sum = 0
+    sum = 0.0
     for xi in _population:
         # average similarity of xi to members of population
-        p_hat = 0
+        p_hat = 0.0
         for xj in _population:
             # calculate euclidean distance
             d = euclidean(xi, xj)
@@ -160,11 +159,12 @@ def PDI(population, problem: Problem, epsilon=0.001):
     return -sum / (m * math.log(m))
 
 
-def FDC(population, population_fitness, problem: Problem):
+def FDC(population: npt.NDArray, population_fitness: npt.NDArray, problem: Problem):
     r"""Fitness Distance Correlation.
 
     Reference paper:
-        Jones, T.C. & Forrest, S. (1995). Fitness Distance Correlation as a Measure of Problem Difficulty for Genetic Algorithms.
+        Jones, T.C. & Forrest, S. (1995). Fitness Distance Correlation as a
+        Measure of Problem Difficulty for Genetic Algorithms.
 
     Args:
         population (numpy.ndarray): population.
@@ -174,13 +174,11 @@ def FDC(population, population_fitness, problem: Problem):
     Returns:
         FDC value.
     """
-    if problem.global_optimum is None:
+    if not isinstance(problem, Problem) or problem.global_optimum is None:
         return 0.0
 
     P, N = np.shape(population)
-    D = np.linalg.norm(
-        population - list(itertools.repeat(problem.global_optimum, P)), axis=1
-    )
+    D = np.linalg.norm(population - list(itertools.repeat(problem.global_optimum, P)), axis=1)
     f_avg = population_fitness.mean()
     f_std = population_fitness.std()
     d_avg = D.mean()
@@ -196,7 +194,7 @@ def FDC(population, population_fitness, problem: Problem):
     return FDC + 1.0
 
 
-def PFSD(population_fitness):
+def PFSD(population_fitness: npt.NDArray):
     r"""Population Fitness Standard Deviation.
 
     Args:
@@ -208,7 +206,7 @@ def PFSD(population_fitness):
     return population_fitness.std()
 
 
-def PFM(population_fitness):
+def PFM(population_fitness: npt.NDArray):
     r"""Population Fitness Mean.
 
     Args:

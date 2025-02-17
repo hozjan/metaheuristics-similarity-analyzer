@@ -1,21 +1,14 @@
-from typing import Any
-from niapy.util.factory import (
-    _algorithm_options,
-    get_algorithm,
-)
+import numpy.typing as npt
 from niapy.problems import Problem
 from niapy.algorithms import Algorithm
 from datetime import datetime
 from pathlib import Path
-from scipy import spatial
 import torch
 from torch import nn
 import numpy as np
 import pygad
-import tools
 from tools.optimization_tools import optimization_runner
 from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTMClassifier
-import tools.problems
 from util.optimization_data import SingleRunData
 from util.helper import get_algorithm_by_name
 import shutil
@@ -52,14 +45,14 @@ class MetaGA:
         ga_crossover_probability: float,
         ga_mutation_num_genes: int,
         ga_keep_elitism: int,
-        gene_spaces: dict[str | Algorithm, dict[str, Any]],
+        gene_spaces: dict[str | Algorithm, dict[str, dict[str, float]]],
         pop_size: int,
         problem: Problem,
-        max_iters: int = np.inf,
-        max_evals: int = np.inf,
+        max_iters: int | float = np.inf,
+        max_evals: int | float = np.inf,
         num_runs: int = 10,
-        pop_diversity_metrics: list[PopDiversityMetric] = None,
-        indiv_diversity_metrics: list[IndivDiversityMetric] = None,
+        pop_diversity_metrics: list[PopDiversityMetric] | None = None,
+        indiv_diversity_metrics: list[IndivDiversityMetric] | None = None,
         n_pca_components: int = 3,
         lstm_num_layers: int = 3,
         lstm_hidden_dim: int = 128,
@@ -68,7 +61,7 @@ class MetaGA:
         test_size: float = 0.2,
         batch_size: int = 20,
         epochs: int = 100,
-        rng_seed: int = None,
+        rng_seed: int | None = None,
         base_archive_path="archive",
     ):
         r"""Initialize meta genetic algorithm.
@@ -77,48 +70,66 @@ class MetaGA:
             fitness_function_type (MetaGAFitnessFunction): Type of fitness function of meta genetic algorithm.
             ga_generations (int): Number of generations of the genetic algorithm.
             ga_solutions_per_pop (int): Number of solutions per generation of the genetic algorithm.
-            ga_percent_parents_mating (int): Percentage of parents mating for production of the offspring of the genetic algorithm [1, 100].
+            ga_percent_parents_mating (int): Percentage of parents mating for production of the offspring of the
+                genetic algorithm [1, 100].
             ga_parent_selection_type (str): Type of parent selection of the genetic algorithm.
-            ga_k_tournament (int): Number of parents participating in the tournament selection of the genetic algorithm. Only has effect when ga_parent_selection_type equals 'tournament'.
+            ga_k_tournament (int): Number of parents participating in the tournament selection of the genetic
+                algorithm. Only has effect when ga_parent_selection_type equals 'tournament'.
             ga_crossover_type (str): Crossover type of the genetic algorithm.
             ga_mutation_type (str): Mutation type of the genetic algorithm.
             ga_crossover_probability (float): Crossover probability of the genetic algorithm [0,1].
             ga_mutation_num_genes (int): Number of genes mutated in the solution of the genetic algorithm.
             ga_keep_elitism (int): Number of solutions that are a part of the elitism of the genetic algorithm.
-            gene_spaces (dict[str | Algorithm, dict[str, Any]]): Gene spaces of the solution.
+            gene_spaces (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene spaces of the solution.
             pop_size (int): Population size of the metaheuristics being optimized.
             problem (Problem): Optimization problem used for optimization.
-            max_iters (Optional[int]): Maximum number of iterations of the metaheuristic being optimized for each solution of the genetic algorithm.
-            max_evals (Optional[int]): Maximum number of evaluations of the metaheuristic being optimized for each solution of the genetic algorithm.
-            num_runs (Optional[int]): Number of runs performed by the metaheuristic being optimized for each solution of the genetic algorithm.
-            pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics calculated. Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
-            indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics calculated. Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
-            n_pca_components (Optional[int]): Number of PCA components to use per learning sample of the neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            lstm_num_layers (Optional[int]): Number of layers of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            lstm_hidden_dim (Optional[int]): Size of the hidden layers of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            lstm_dropout (Optional[float]): Size of the dropout of the LSTM neural network [0, 1]. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            val_size (Optional[float]): Size of the dataset used as validation during training of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            test_size (Optional[float]): Size of the dataset used as test during testing of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            batch_size (Optional[int]): Size of the batch used during training of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            epochs (Optional[int]): Number of epochs performed during training of the LSTM neural network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            rng_seed (Optional[int]): Seed of the random generator. Provide for reproducible results. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            max_iters (Optional[int | float]): Maximum number of iterations of the metaheuristic being optimized for
+                each solution of the genetic algorithm.
+            max_evals (Optional[int | float]): Maximum number of evaluations of the metaheuristic being optimized for
+                each solution of the genetic algorithm.
+            num_runs (Optional[int]): Number of runs performed by the metaheuristic being optimized for each solution
+                of the genetic algorithm.
+            pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics calculated.
+                Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
+            indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics
+                calculated. Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
+            n_pca_components (Optional[int]): Number of PCA components to use per learning sample of the neural
+                network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            lstm_num_layers (Optional[int]): Number of layers of the LSTM neural network. Only has effect when
+                fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            lstm_hidden_dim (Optional[int]): Size of the hidden layers of the LSTM neural network. Only has effect when
+                fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            lstm_dropout (Optional[float]): Size of the dropout of the LSTM neural network [0, 1]. Only has effect when
+                fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            val_size (Optional[float]): Size of the dataset used as validation during training of the LSTM neural
+                network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            test_size (Optional[float]): Size of the dataset used as test during testing of the LSTM neural network.
+                Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            batch_size (Optional[int]): Size of the batch used during training of the LSTM neural network. Only has
+                effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            epochs (Optional[int]): Number of epochs performed during training of the LSTM neural network. Only has
+                effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+            rng_seed (Optional[int]): Seed of the random generator. Provide for reproducible results. Only has effect
+                when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
             base_archive_path (Optional[str]): Base archive path of the meta genetic algorithm.
+
+            ValueError: No diversity metrics defined when required.
+            ValueError: Neither of `max_evals` or `max_iters` was assigned a finite value.
         """
+
         if (
             fitness_function_type
             in [
                 MetaGAFitnessFunction.PERFORMANCE_SIMILARITY,
                 MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY,
             ]
-        ) and (pop_diversity_metrics is None or indiv_diversity_metrics is None):
+        ) and (pop_diversity_metrics is None and indiv_diversity_metrics is None):
             raise ValueError(
                 "Diversity metrics must be defined when fitness_function_type set to `PERFORMANCE_SIMILARITY`."
             )
 
         if max_evals == np.inf and max_iters == np.inf:
-            raise ValueError(
-                "Defining a finite value for max_evals and/or max_iters is required."
-            )
+            raise ValueError("Defining a finite value for max_evals and/or max_iters is required.")
 
         self.fitness_function_type = fitness_function_type
         self.gene_spaces = gene_spaces
@@ -150,15 +161,15 @@ class MetaGA:
         self.rng_seed = rng_seed
         self.base_archive_path = base_archive_path
 
-        self.meta_ga = None
-        self.combined_gene_space = []
-        self.low_ranges = []
-        self.high_ranges = []
-        self.random_mutation_min_val = []
-        self.random_mutation_max_val = []
+        self.meta_ga: pygad.GA | None = None
+        self.combined_gene_space: list[dict[str, float]] = []
+        self.low_ranges: list[float] = []
+        self.high_ranges: list[float] = []
+        self.random_mutation_min_val: list[float] = []
+        self.random_mutation_max_val: list[float] = []
         self.__fitness_function = None
-        self.__algorithms = []
-        self.__target_algorithm = None
+        self.__algorithms: list[str] = []
+        self.__target_algorithm: Algorithm | None = None
         self.__model_filename = "meta_ga_lstm_model.pt"
         self.__meta_dataset = "meta_dataset"
         self.__archive_path = ""
@@ -168,6 +179,13 @@ class MetaGA:
     def __init_parameters(self):
         """
         Initialize meta genetic algorithm parameters and create folder structure.
+
+        Raises:
+            ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
+            ValueError: Incorrect number of algorithms provided in the `gene_spaces`.
+            ValueError: Incorrect number of algorithms provided in the `gene_spaces`.
+            ValueError: Incorrect number of algorithms provided in the `gene_spaces`.
+            TypeError: Provided `problem` is of incorrect type.
         """
         # check if all values in the provided gene spaces are correct and
         # assemble combined gene space for meta GA
@@ -176,69 +194,56 @@ class MetaGA:
             self.__algorithms.append(algorithm.Name[1])
             for setting in self.gene_spaces[alg_name]:
                 if not hasattr(algorithm, setting):
-                    raise NameError(
-                        f"Algorithm `{alg_name}` has no attribute named `{setting}`."
-                    )
+                    raise ValueError(f"Algorithm `{alg_name}` has no attribute named `{setting}`.")
                 self.combined_gene_space.append(self.gene_spaces[alg_name][setting])
                 self.low_ranges.append(self.gene_spaces[alg_name][setting]["low"])
                 self.high_ranges.append(self.gene_spaces[alg_name][setting]["high"])
                 self.random_mutation_max_val.append(
-                    abs(
-                        self.gene_spaces[alg_name][setting]["high"]
-                        - self.gene_spaces[alg_name][setting]["low"]
-                    )
-                    * 0.5
+                    abs(self.gene_spaces[alg_name][setting]["high"] - self.gene_spaces[alg_name][setting]["low"]) * 0.5
                 )
                 self.random_mutation_min_val.append(-self.random_mutation_max_val[-1])
 
         if self.fitness_function_type == MetaGAFitnessFunction.PARAMETER_TUNING:
             if len(self.__algorithms) != 1:
                 raise ValueError(
-                    f"Only one algorithm must be defined in the gene_spaces provided when fitness_function_type set to `PARAMETER_TUNING`."
+                    """Only one algorithm must be defined in the `gene_spaces` provided
+                    when fitness_function_type set to `PARAMETER_TUNING`."""
                 )
             self.__fitness_function = self.meta_ga_fitness_function_for_parameter_tuning
         elif self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY:
             if len(self.__algorithms) < 2:
                 raise ValueError(
-                    f"Minimum of two algorithms must be defined in gene_spaces provided when fitness_function_type set to `PERFORMANCE_SIMILARITY`."
+                    """Minimum of two algorithms must be defined in `gene_spaces` provided
+                    when fitness_function_type set to `PERFORMANCE_SIMILARITY`."""
                 )
-            self.__fitness_function = (
-                self.meta_ga_fitness_function_for_performance_similarity
-            )
-        elif (
-            self.fitness_function_type
-            == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
-        ):
+            self.__fitness_function = self.meta_ga_fitness_function_for_performance_similarity
+        elif self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
             if len(self.__algorithms) != 1:
                 raise ValueError(
-                    f"Only one algorithm must be defined in gene_spaces provided when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."
+                    """Only one algorithm must be defined in `gene_spaces` provided when
+                    fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."""
                 )
-            self.__fitness_function = (
-                self.meta_ga_fitness_function_for_target_performance_similarity
-            )
+            self.__fitness_function = self.meta_ga_fitness_function_for_target_performance_similarity
 
         # check if the provided optimization problem is correct
         if not isinstance(self.problem, Problem):
-            raise TypeError(
-                f"Provided problem type `{type(self.problem).__name__}` is not compatible."
-            )
+            raise TypeError(f"Provided problem type `{type(self.problem).__name__}` is not compatible.")
 
-    def __create_folder_structure(self, prefix: str = None):
+    def __create_folder_structure(self, prefix: str | None = None):
         r"""Create folder structure for the meta genetic algorithm.
 
         Args:
-            prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current datetime by default.
+            prefix (Optional[str]): Use custom prefix for the name of the base
+                folder in structure. Uses current datetime by default.
         """
         if prefix is None:
-            prefix = str(datetime.now().strftime(f"%m-%d_%H.%M.%S"))
+            prefix = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
         self.__archive_path = os.path.join(
             self.base_archive_path,
             "_".join([prefix, *self.__algorithms, self.problem.name()]),
         )
-        self.__meta_ga_tmp_data_path = os.path.join(
-            self.__archive_path, "meta_ga_tmp_data"
-        )
-        if os.path.exists(self.__archive_path) == False:
+        self.__meta_ga_tmp_data_path = os.path.join(self.__archive_path, "meta_ga_tmp_data")
+        if os.path.exists(self.__archive_path) is False:
             Path(self.__archive_path).mkdir(parents=True, exist_ok=True)
 
     def __get_logger(self, filename: str = "meta_ga_log_file"):
@@ -246,6 +251,9 @@ class MetaGA:
 
         Args:
             filename (Optional[str]): Log file name.
+
+        Returns:
+            logger (Logger)
         """
         level = logging.DEBUG
 
@@ -255,9 +263,7 @@ class MetaGA:
 
         file_handler = logging.FileHandler(f"{filename}.txt", "a+", "utf-8")
         file_handler.setLevel(logging.DEBUG)
-        file_format = logging.Formatter(
-            "%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-        )
+        file_format = logging.Formatter("%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
         file_handler.setFormatter(file_format)
         logger.addHandler(file_handler)
 
@@ -271,28 +277,30 @@ class MetaGA:
 
     @staticmethod
     def solution_to_algorithm_attributes(
-        solution: list[float],
-        gene_spaces: dict[str | Algorithm, dict[str, Any]],
+        solution: list[float] | npt.NDArray,
+        gene_spaces: dict[str | Algorithm, dict[str, dict[str, float]]],
         pop_size: int,
     ):
-        r"""Apply meta genetic algorithm solution to an corresponding algorithms based on the gene spaces used for the meta optimization.
-        Make sure the solution matches the gene space.
+        r"""Apply meta genetic algorithm solution to an corresponding algorithms based on
+        the gene spaces used for the meta optimization. Make sure the solution matches the gene space.
 
         Args:
-            solution (list[float]): Meta genetic algorithm solution.
-            gene_spaces (dict[str | Algorithm, dict[str, Any]]): Gene spaces of the solution.
+            solution (list[float | numpy.ndarray]): Meta genetic algorithm solution.
+            gene_spaces (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene spaces of the solution.
             pop_size (int): Population size of the algorithms returned.
 
         Returns:
             list: Array of Algorithms configured based on solution and gene_space.
+
+        Raises:
+            ValueError: The length of the provided solution does not match the number of attributes in `gene_spaces`.
+            ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
         """
         settings_counter = 0
         for alg_name in gene_spaces:
             settings_counter += len(gene_spaces[alg_name])
         if settings_counter != len(solution):
-            raise ValueError(
-                f"Solution length does not match the count of the gene space settings."
-            )
+            raise ValueError("Solution length does not match the count of the gene space settings.")
 
         solution_iter = 0
         algorithms = []
@@ -300,9 +308,7 @@ class MetaGA:
             algorithm = get_algorithm_by_name(alg_name, population_size=pop_size)
             for setting in gene_spaces[alg_name]:
                 if not hasattr(algorithm, setting):
-                    raise NameError(
-                        f"Algorithm `{alg_name}` has no attribute named `{setting}`."
-                    )
+                    raise ValueError(f"Algorithm `{alg_name}` has no attribute named `{setting}`.")
                 algorithm.__setattr__(setting, solution[solution_iter])
                 solution_iter += 1
             algorithms.append(algorithm)
@@ -312,12 +318,8 @@ class MetaGA:
     def on_generation_progress(ga: pygad.GA):
         r"""Called after each genetic algorithm generation."""
         ga.logger.info(f"Generation = {ga.generations_completed}")
-        ga.logger.info(
-            f"->Fitness  = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[1]}"
-        )
-        ga.logger.info(
-            f"->Solution = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[0]}"
-        )
+        ga.logger.info(f"->Fitness  = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[1]}")
+        ga.logger.info(f"->Solution = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[0]}")
 
     def __clean_tmp_data(self):
         r"""Clean up temporary data created by the meta genetic algorithm."""
@@ -325,22 +327,16 @@ class MetaGA:
             print("Cleaning up meta GA temporary data...")
             if os.path.exists(self.__meta_ga_tmp_data_path):
                 shutil.rmtree(self.__meta_ga_tmp_data_path)
-        except:
+        except Exception:
             print("Cleanup failed!")
 
-    def meta_ga_fitness_function_for_parameter_tuning(
-        self, meta_ga, solution, solution_idx
-    ):
+    def meta_ga_fitness_function_for_parameter_tuning(self, meta_ga, solution, solution_idx):
         r"""Fitness function of the meta genetic algorithm.
         For tuning parameters of metaheuristic algorithms for best performance."""
 
-        meta_dataset = os.path.join(
-            self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}"
-        )
+        meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
 
-        algorithms = MetaGA.solution_to_algorithm_attributes(
-            solution, self.gene_spaces, self.pop_size
-        )
+        algorithms = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
 
         # gather optimization data
         for algorithm in algorithms:
@@ -363,28 +359,20 @@ class MetaGA:
                 runs = os.listdir(os.path.join(meta_dataset, algorithm, problem))
                 for run in runs:
                     run_path = os.path.join(meta_dataset, algorithm, problem, run)
-                    fitness_values.append(
-                        SingleRunData.import_from_json(run_path).best_fitness
-                    )
+                    fitness_values.append(SingleRunData.import_from_json(run_path).best_fitness)
 
         avg_fitness = np.average(fitness_values)
 
         return 1.0 / avg_fitness + 0.0000000001
 
-    def meta_ga_fitness_function_for_target_performance_similarity(
-        self, meta_ga, solution, solution_idx
-    ):
+    def meta_ga_fitness_function_for_target_performance_similarity(self, meta_ga, solution, solution_idx):
         r"""Fitness function of the meta genetic algorithm.
         For tuning parameters of metaheuristic algorithm for best similarity of diversity metrics.
         """
 
-        meta_dataset = os.path.join(
-            self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}"
-        )
+        meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
 
-        algorithms = MetaGA.solution_to_algorithm_attributes(
-            solution, self.gene_spaces, self.pop_size
-        )
+        algorithms = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
 
         # gather optimization data
         for algorithm in algorithms:
@@ -421,35 +409,21 @@ class MetaGA:
 
         similarities = []
         for target, optimized in zip(target_runs, optimized_runs):
-            target_srd = SingleRunData.import_from_json(
-                os.path.join(target_runs_path, target)
-            )
-            optimized_srd = SingleRunData.import_from_json(
-                os.path.join(optimized_runs_path, optimized)
-            )
-            similarities.append(
-                target_srd.get_diversity_metrics_similarity(optimized_srd)
-            )
+            target_srd = SingleRunData.import_from_json(os.path.join(target_runs_path, target))
+            optimized_srd = SingleRunData.import_from_json(os.path.join(optimized_runs_path, optimized))
+            similarities.append(target_srd.get_diversity_metrics_similarity(optimized_srd))
 
         return np.mean(similarities)
 
-    def meta_ga_fitness_function_for_performance_similarity(
-        self, meta_ga, solution, solution_idx
-    ):
+    def meta_ga_fitness_function_for_performance_similarity(self, meta_ga, solution, solution_idx):
         r"""Fitness function of the meta genetic algorithm.
         For tuning parameters of metaheuristic algorithms for best similarity of diversity metrics.
         """
 
-        model_filename = os.path.join(
-            self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__model_filename}"
-        )
-        meta_dataset = os.path.join(
-            self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}"
-        )
+        model_filename = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__model_filename}")
+        meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
 
-        algorithms = MetaGA.solution_to_algorithm_attributes(
-            solution, self.gene_spaces, self.pop_size
-        )
+        algorithms = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
 
         # gather optimization data
         for algorithm in algorithms:
@@ -489,9 +463,7 @@ class MetaGA:
         )
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
         loss_fn = nn.CrossEntropyLoss()
-        device = (
-            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-        )
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
         model.to(device)
         nn_train(
@@ -514,8 +486,8 @@ class MetaGA:
     def __before_meta_optimization(self):
         r"""Execute before meta genetic algorithm optimization."""
         if (
-            self.fitness_function_type
-            == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
+            self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
+            and self.__target_algorithm is not None
         ):
             optimization_runner(
                 algorithm=self.__target_algorithm,
@@ -535,9 +507,9 @@ class MetaGA:
         self,
         filename="meta_ga_obj",
         plot_filename="meta_ga_fitness_plot",
-        target_algorithm: Algorithm = None,
-        get_info=False,
-        prefix: str = None,
+        target_algorithm: Algorithm | None = None,
+        get_info: bool = False,
+        prefix: str | None = None,
         return_best_solution: bool = False,
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
@@ -545,23 +517,29 @@ class MetaGA:
         Args:
             filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
             plot_filename (Optional[str]): Name of the fitness plot image file.
-            target_algorithm (Optional[Algorithm]): Target algorithm for the performance similarity evaluation. Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
+            target_algorithm (Optional[Algorithm]): Target algorithm for the performance similarity evaluation.
+                Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
-            prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current datetime by default.
+            prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current
+                datetime by default.
             return_best_solution (Optional[bool]): returns best solution if True.
 
         Returns:
             best_solution (numpy.ndarray[float] | None): Returns best solution.
+
+        Raises:
+            ValueError: `target_algorithm` was not provided when required.
         """
-        self.__target_algorithm = target_algorithm
         if (
-            self.fitness_function_type
-            == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
-            and self.__target_algorithm == None
+            self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
+            and target_algorithm is None
         ):
             raise ValueError(
-                "target_algorithm must be defined when running optimization with fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."
+                """target_algorithm must be defined when running optimization with
+                fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."""
             )
+        else:
+            self.__target_algorithm = target_algorithm
 
         self.__create_folder_structure(prefix=prefix)
         self.__before_meta_optimization()
@@ -571,9 +549,7 @@ class MetaGA:
                 filename=os.path.join(self.__archive_path, "meta_ga_info"),
             )
 
-        num_parents_mating = int(
-            self.ga_solutions_per_pop * (self.ga_percent_parents_mating / 100)
-        )
+        num_parents_mating = int(self.ga_solutions_per_pop * (self.ga_percent_parents_mating / 100))
 
         self.meta_ga = pygad.GA(
             num_generations=self.ga_generations,
@@ -597,20 +573,15 @@ class MetaGA:
             on_generation=self.on_generation_progress,
             save_best_solutions=True,
             save_solutions=True,
-            logger=self.__get_logger(
-                filename=os.path.join(self.__archive_path, "meta_ga_log_file")
-            ),
+            logger=self.__get_logger(filename=os.path.join(self.__archive_path, "meta_ga_log_file")),
         )
 
         self.meta_ga.run()
-
         self.__clean_tmp_data()
 
         self.meta_ga.logger.handlers.clear()
         self.meta_ga.save(os.path.join(self.__archive_path, filename))
-        self.meta_ga.plot_fitness(
-            save_dir=os.path.join(self.__archive_path, f"{plot_filename}.png")
-        )
+        self.meta_ga.plot_fitness(save_dir=os.path.join(self.__archive_path, f"{plot_filename}.png"))
         best_solutions = self.meta_ga.best_solutions
         print(f"Best solution: {best_solutions[-1]}")
 
@@ -733,12 +704,11 @@ class MetaGA:
                             <td>{self.pop_size}</td>
                         </tr>"""
                     for setting in self.gene_spaces[alg_name]:
-                        gene = ", ".join(
-                            str(value)
-                            for value in self.gene_spaces[alg_name][setting].values()
-                        )
+                        gene = ", ".join(str(value) for value in self.gene_spaces[alg_name][setting].values())
                         combined_gene_space_len += 1
-                        node_label += f"<tr><td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td></tr>"
+                        node_label += f"""<tr>
+                            <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
+                        </tr>"""
                     node_label += "</table>>"
                     cc.node(name=f"gene_space_{alg_idx}", label=node_label)
 
@@ -755,7 +725,7 @@ class MetaGA:
                         <td port="gene_fitness">?</td>
                     </tr>
                 </table>>"""
-                cc.node(name=f"combined_gene_space", label=combined_gene_string)
+                cc.node(name="combined_gene_space", label=combined_gene_string)
 
                 for alg_idx in range(len(self.gene_spaces)):
                     cc.edge(f"gene_space_{alg_idx}", "combined_gene_space")
@@ -786,6 +756,10 @@ class MetaGA:
                         <td>{self.max_iters}</td>
                     </tr>
                     <tr>
+                        <td>max evals</td>
+                        <td>{self.max_evals}</td>
+                    </tr>
+                    <tr>
                         <td>num runs</td>
                         <td>{self.num_runs}</td>
                     </tr>
@@ -801,8 +775,9 @@ class MetaGA:
             )
 
             if (
-                self.fitness_function_type
-                == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
+                self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
+                and self.pop_diversity_metrics is not None
+                and self.indiv_diversity_metrics is not None
             ):
                 with c.subgraph(name="cluster_10") as cc:
                     cc.attr(
@@ -818,17 +793,19 @@ class MetaGA:
                         shape="plaintext",
                         margin="0",
                     )
-                    pop_metrics_label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Pop Metrics</b></td></tr>'
-                    for metric in self.pop_diversity_metrics:
-                        pop_metrics_label += f"""<tr><td>{metric.value}</td></tr>"""
+                    pop_metrics_label = """<<table border="0" cellborder="1" cellspacing="0">
+                        <tr><td><b>Pop Metrics</b></td></tr>"""
+                    for pop_metric in self.pop_diversity_metrics:
+                        pop_metrics_label += f"""<tr><td>{pop_metric.value}</td></tr>"""
                     pop_metrics_label += "</table>>"
-                    cc.node(name=f"pop_metrics", label=pop_metrics_label)
+                    cc.node(name="pop_metrics", label=pop_metrics_label)
 
-                    indiv_metrics_label = f'<<table border="0" cellborder="1" cellspacing="0"><tr><td><b>Indiv Metrics</b></td></tr>'
-                    for metric in self.indiv_diversity_metrics:
-                        indiv_metrics_label += f"""<tr><td>{metric.value}</td></tr>"""
+                    indiv_metrics_label = """<<table border="0" cellborder="1" cellspacing="0">
+                        <tr><td><b>Indiv Metrics</b></td></tr>"""
+                    for ind_metric in self.indiv_diversity_metrics:
+                        indiv_metrics_label += f"<tr><td>{ind_metric.value}</td></tr>"
                     indiv_metrics_label += "</table>>"
-                    cc.node(name=f"indiv_metrics", label=indiv_metrics_label)
+                    cc.node(name="indiv_metrics", label=indiv_metrics_label)
 
         if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY:
             with gv.subgraph(name="cluster_2") as c:
@@ -978,7 +955,7 @@ class MetaGA:
                             </tr>
                             <tr>
                                 <td>input size</td>
-                                <td>{len(self.pop_diversity_metrics)}</td>
+                                <td>{0 if self.pop_diversity_metrics is None else len(self.pop_diversity_metrics)}</td>
                             </tr>
                             <tr>
                                 <td>hidden size</td>
@@ -1080,11 +1057,12 @@ class MetaGA:
             tail_name="combined_gene_space",
             head_name=(
                 "pop_metrics"
-                if self.fitness_function_type
-                == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
+                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
                 else "optimization_parameters"
             ),
-            label=f" for each {'algorithm per ' if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY else ''} \nsolution",
+            label=f""" for each {
+                'algorithm per ' if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY else ''
+                } \nsolution""",
             lhead="cluster_1",
         )
         gv.edge(
@@ -1102,26 +1080,22 @@ class MetaGA:
         gv.edge(
             tail_name=(
                 "PCA_parameters"
-                if self.fitness_function_type
-                == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
+                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
                 else "optimization_parameters"
             ),
             head_name="combined_gene_space:gene_fitness",
             label=(
                 " model accuracy\non test dataset"
-                if self.fitness_function_type
-                == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
+                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
                 else (
                     "average fitness \nof runs"
-                    if self.fitness_function_type
-                    == MetaGAFitnessFunction.PARAMETER_TUNING
+                    if self.fitness_function_type == MetaGAFitnessFunction.PARAMETER_TUNING
                     else "cosine distance \nof average feature vectors\nof target and optimized algorithm"
                 )
             ),
             ltail=(
                 "cluster_2"
-                if self.fitness_function_type
-                == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
+                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
                 else "cluster_1"
             ),
         )
