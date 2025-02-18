@@ -7,17 +7,17 @@ import torch
 from torch import nn
 import numpy as np
 import pygad
-from tools.optimization_tools import optimization_runner
-from tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTMClassifier
-from util.optimization_data import SingleRunData
-from util.helper import get_algorithm_by_name
+from msa.tools.optimization_tools import optimization_runner
+from msa.tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTMClassifier
+from msa.util.optimization_data import SingleRunData
+from msa.util.helper import get_algorithm_by_name
 import shutil
 import logging
 import graphviz
 from enum import Enum
 import os
-from util.pop_diversity_metrics import PopDiversityMetric
-from util.indiv_diversity_metrics import IndivDiversityMetric
+from msa.util.pop_diversity_metrics import PopDiversityMetric
+from msa.util.indiv_diversity_metrics import IndivDiversityMetric
 
 
 class MetaGAFitnessFunction(Enum):

@@ -1,6 +1,6 @@
-from util.indiv_diversity_metrics import IndivDiversityMetric
-from util.pop_diversity_metrics import PopDiversityMetric
-from tools.problems.schwefel import Schwefel
+from msa.util.indiv_diversity_metrics import IndivDiversityMetric
+from msa.util.pop_diversity_metrics import PopDiversityMetric
+from msa.problems.schwefel import Schwefel
 
 
 RNG_SEED = 42

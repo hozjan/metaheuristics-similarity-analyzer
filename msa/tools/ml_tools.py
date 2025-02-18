@@ -21,7 +21,7 @@ from enum import Enum
 import os
 import numpy as np
 
-from util.optimization_data import SingleRunData
+from msa.util.optimization_data import SingleRunData
 
 __all__ = [
     "NNType",

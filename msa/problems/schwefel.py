@@ -3,7 +3,7 @@
 """Implementations of Schwefel's functions."""
 
 import numpy as np
-from tools.problems.problem import Problem
+from msa.problems.problem import Problem
 
 __all__ = ["Schwefel", "Schwefel221", "Schwefel222", "ModifiedSchwefel"]
 

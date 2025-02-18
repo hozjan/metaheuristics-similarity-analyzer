@@ -9,9 +9,9 @@ import numpy as np
 from numpy.random import default_rng
 from pathlib import Path
 
-from util.optimization_data import SingleRunData, PopulationData
-from util.pop_diversity_metrics import PopDiversityMetric
-from util.indiv_diversity_metrics import IndivDiversityMetric
+from msa.util.optimization_data import SingleRunData, PopulationData
+from msa.util.pop_diversity_metrics import PopDiversityMetric
+from msa.util.indiv_diversity_metrics import IndivDiversityMetric
 
 __all__ = ["optimization", "optimization_worker", "optimization_runner"]
 

@@ -9,10 +9,9 @@ from json import JSONEncoder
 from niapy.problems import Problem
 from sklearn.decomposition import PCA
 import math
-import util
-import util.helper
-from util.indiv_diversity_metrics import IDT, ISI, IFM, IFIQR, IndivDiversityMetric
-from util.pop_diversity_metrics import PDC, PED, PMD, AAD, PDI, FDC, PFSD, PFM, PopDiversityMetric
+from msa.util.helper import smape
+from msa.util.indiv_diversity_metrics import IDT, ISI, IFM, IFIQR, IndivDiversityMetric
+from msa.util.pop_diversity_metrics import PDC, PED, PMD, AAD, PDI, FDC, PFSD, PFM, PopDiversityMetric
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -287,10 +286,10 @@ class SingleRunData:
 
         smape_values = []
         for fpm, spm in zip(first_pm, second_pm):
-            smape_values.append(util.helper.smape(fpm, spm))
+            smape_values.append(smape(fpm, spm))
 
         for fim, sim in zip(first_im, second_im):
-            smape_values.append(util.helper.smape(fim, sim))
+            smape_values.append(smape(fim, sim))
 
         if get_raw_values:
             return np.array(smape_values)

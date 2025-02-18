@@ -1,7 +1,7 @@
 """Module containing algorithms compatible with niapy framework modified for use in the MSA"""
 
-from tools.algorithms.fa import FireflyAlgorithm
-from tools.algorithms.pso import (
+from msa.algorithms.fa import FireflyAlgorithm
+from msa.algorithms.pso import (
     ParticleSwarmAlgorithm,
     ParticleSwarmOptimization,
     CenterParticleSwarmOptimization,

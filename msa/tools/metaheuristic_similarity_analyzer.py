@@ -5,11 +5,11 @@ import os
 from pylatex import Document, Section, Subsection
 from pylatex import MultiColumn, Package, LongTable
 from pylatex.utils import bold
-from util.helper import random_float_with_step, get_algorithm_by_name
-from tools.meta_ga import MetaGA, MetaGAFitnessFunction
-from tools.optimization_tools import optimization_runner
-from tools.ml_tools import svm_and_knn_classification
-from util.optimization_data import SingleRunData
+from msa.util.helper import random_float_with_step, get_algorithm_by_name
+from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
+from msa.tools.optimization_tools import optimization_runner
+from msa.tools.ml_tools import svm_and_knn_classification
+from msa.util.optimization_data import SingleRunData
 import numpy as np
 import numpy.typing as npt
 from scipy import spatial, stats
