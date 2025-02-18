@@ -3,12 +3,9 @@ from niapy.problems import Problem
 from niapy.algorithms import Algorithm
 from datetime import datetime
 from pathlib import Path
-import torch
-from torch import nn
 import numpy as np
 import pygad
 from msa.tools.optimization_tools import optimization_runner
-from msa.tools.ml_tools import get_data_loaders, nn_test, nn_train, LSTMClassifier
 from msa.util.optimization_data import SingleRunData
 from msa.util.helper import get_algorithm_by_name
 import shutil
@@ -22,8 +19,7 @@ from msa.util.indiv_diversity_metrics import IndivDiversityMetric
 
 class MetaGAFitnessFunction(Enum):
     PARAMETER_TUNING = 0
-    PERFORMANCE_SIMILARITY = 1
-    TARGET_PERFORMANCE_SIMILARITY = 2
+    TARGET_PERFORMANCE_SIMILARITY = 1
 
 
 __all__ = ["MetaGA"]
@@ -53,14 +49,6 @@ class MetaGA:
         num_runs: int = 10,
         pop_diversity_metrics: list[PopDiversityMetric] | None = None,
         indiv_diversity_metrics: list[IndivDiversityMetric] | None = None,
-        n_pca_components: int = 3,
-        lstm_num_layers: int = 3,
-        lstm_hidden_dim: int = 128,
-        lstm_dropout: float = 0.2,
-        val_size: float = 0.2,
-        test_size: float = 0.2,
-        batch_size: int = 20,
-        epochs: int = 100,
         rng_seed: int | None = None,
         base_archive_path="archive",
     ):
@@ -90,40 +78,20 @@ class MetaGA:
             num_runs (Optional[int]): Number of runs performed by the metaheuristic being optimized for each solution
                 of the genetic algorithm.
             pop_diversity_metrics (Optional[list[PopDiversityMetric]]): List of population diversity metrics calculated.
-                Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
+                Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics
-                calculated. Only has effect when fitness_function_type set to `*PERFORMANCE_SIMILARITY`.
-            n_pca_components (Optional[int]): Number of PCA components to use per learning sample of the neural
-                network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            lstm_num_layers (Optional[int]): Number of layers of the LSTM neural network. Only has effect when
-                fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            lstm_hidden_dim (Optional[int]): Size of the hidden layers of the LSTM neural network. Only has effect when
-                fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            lstm_dropout (Optional[float]): Size of the dropout of the LSTM neural network [0, 1]. Only has effect when
-                fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            val_size (Optional[float]): Size of the dataset used as validation during training of the LSTM neural
-                network. Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            test_size (Optional[float]): Size of the dataset used as test during testing of the LSTM neural network.
-                Only has effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            batch_size (Optional[int]): Size of the batch used during training of the LSTM neural network. Only has
-                effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
-            epochs (Optional[int]): Number of epochs performed during training of the LSTM neural network. Only has
-                effect when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+                calculated. Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             rng_seed (Optional[int]): Seed of the random generator. Provide for reproducible results. Only has effect
-                when fitness_function_type set to `PERFORMANCE_SIMILARITY`.
+                when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             base_archive_path (Optional[str]): Base archive path of the meta genetic algorithm.
 
             ValueError: No diversity metrics defined when required.
             ValueError: Neither of `max_evals` or `max_iters` was assigned a finite value.
         """
 
-        if (
-            fitness_function_type
-            in [
-                MetaGAFitnessFunction.PERFORMANCE_SIMILARITY,
-                MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY,
-            ]
-        ) and (pop_diversity_metrics is None and indiv_diversity_metrics is None):
+        if fitness_function_type is MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY and (
+            pop_diversity_metrics is None and indiv_diversity_metrics is None
+        ):
             raise ValueError(
                 "Diversity metrics must be defined when fitness_function_type set to `PERFORMANCE_SIMILARITY`."
             )
@@ -150,14 +118,6 @@ class MetaGA:
         self.num_runs = num_runs
         self.pop_diversity_metrics = pop_diversity_metrics
         self.indiv_diversity_metrics = indiv_diversity_metrics
-        self.n_pca_components = n_pca_components
-        self.lstm_num_layers = lstm_num_layers
-        self.lstm_hidden_dim = lstm_hidden_dim
-        self.lstm_dropout = lstm_dropout
-        self.val_size = val_size
-        self.test_size = test_size
-        self.batch_size = batch_size
-        self.epochs = epochs
         self.rng_seed = rng_seed
         self.base_archive_path = base_archive_path
 
@@ -170,7 +130,6 @@ class MetaGA:
         self.__fitness_function = None
         self.__algorithms: list[str] = []
         self.__target_algorithm: Algorithm | None = None
-        self.__model_filename = "meta_ga_lstm_model.pt"
         self.__meta_dataset = "meta_dataset"
         self.__archive_path = ""
         self.__meta_ga_tmp_data_path = ""
@@ -210,13 +169,6 @@ class MetaGA:
                     when fitness_function_type set to `PARAMETER_TUNING`."""
                 )
             self.__fitness_function = self.meta_ga_fitness_function_for_parameter_tuning
-        elif self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY:
-            if len(self.__algorithms) < 2:
-                raise ValueError(
-                    """Minimum of two algorithms must be defined in `gene_spaces` provided
-                    when fitness_function_type set to `PERFORMANCE_SIMILARITY`."""
-                )
-            self.__fitness_function = self.meta_ga_fitness_function_for_performance_similarity
         elif self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
             if len(self.__algorithms) != 1:
                 raise ValueError(
@@ -414,74 +366,6 @@ class MetaGA:
             similarities.append(target_srd.get_diversity_metrics_similarity(optimized_srd))
 
         return np.mean(similarities)
-
-    def meta_ga_fitness_function_for_performance_similarity(self, meta_ga, solution, solution_idx):
-        r"""Fitness function of the meta genetic algorithm.
-        For tuning parameters of metaheuristic algorithms for best similarity of diversity metrics.
-        """
-
-        model_filename = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__model_filename}")
-        meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
-
-        algorithms = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
-
-        # gather optimization data
-        for algorithm in algorithms:
-            optimization_runner(
-                algorithm=algorithm,
-                problem=self.problem,
-                runs=self.num_runs,
-                dataset_path=meta_dataset,
-                pop_diversity_metrics=self.pop_diversity_metrics,
-                indiv_diversity_metrics=self.indiv_diversity_metrics,
-                max_iters=self.max_iters,
-                max_evals=self.max_evals,
-                rng_seed=self.rng_seed,
-                keep_pop_data=False,
-                parallel_processing=True,
-            )
-
-        train_data_loader, val_data_loader, test_data_loader, labels = get_data_loaders(
-            dataset_path=meta_dataset,
-            batch_size=self.batch_size,
-            val_size=self.val_size,
-            test_size=self.test_size,
-            n_pca_components=self.n_pca_components,
-            problems=[self.problem.name()],
-            random_state=self.rng_seed,
-        )
-
-        # model parameters
-        pop_features, indiv_features, _ = next(iter(train_data_loader))
-        model = LSTMClassifier(
-            input_dim=np.shape(pop_features)[2],
-            aux_input_dim=np.shape(indiv_features)[1],
-            num_labels=len(labels),
-            hidden_dim=self.lstm_hidden_dim,
-            num_layers=self.lstm_num_layers,
-            dropout=self.lstm_dropout,
-        )
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-5)
-        loss_fn = nn.CrossEntropyLoss()
-        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-
-        model.to(device)
-        nn_train(
-            model=model,
-            train_data_loader=train_data_loader,
-            val_data_loader=val_data_loader,
-            epochs=self.epochs,
-            loss_fn=loss_fn,
-            optimizer=optimizer,
-            device=device,
-            model_filename=model_filename,
-        )
-
-        model = torch.load(model_filename, map_location=torch.device(device))
-        model.to(device)
-        accuracy = nn_test(model, test_data_loader, device)
-
-        return 1.0 - accuracy + 0.0000000001
 
     def __before_meta_optimization(self):
         r"""Execute before meta genetic algorithm optimization."""
@@ -774,217 +658,6 @@ class MetaGA:
                 </table>>""",
             )
 
-            if (
-                self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
-                and self.pop_diversity_metrics is not None
-                and self.indiv_diversity_metrics is not None
-            ):
-                with c.subgraph(name="cluster_10") as cc:
-                    cc.attr(
-                        style="filled",
-                        color=sub_graph_color,
-                        name="metrics",
-                        label="Diversity Metrics",
-                    )
-                    cc.node_attr.update(
-                        style="filled",
-                        color=table_border_color,
-                        fillcolor=table_background_color,
-                        shape="plaintext",
-                        margin="0",
-                    )
-                    pop_metrics_label = """<<table border="0" cellborder="1" cellspacing="0">
-                        <tr><td><b>Pop Metrics</b></td></tr>"""
-                    for pop_metric in self.pop_diversity_metrics:
-                        pop_metrics_label += f"""<tr><td>{pop_metric.value}</td></tr>"""
-                    pop_metrics_label += "</table>>"
-                    cc.node(name="pop_metrics", label=pop_metrics_label)
-
-                    indiv_metrics_label = """<<table border="0" cellborder="1" cellspacing="0">
-                        <tr><td><b>Indiv Metrics</b></td></tr>"""
-                    for ind_metric in self.indiv_diversity_metrics:
-                        indiv_metrics_label += f"<tr><td>{ind_metric.value}</td></tr>"
-                    indiv_metrics_label += "</table>>"
-                    cc.node(name="indiv_metrics", label=indiv_metrics_label)
-
-        if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY:
-            with gv.subgraph(name="cluster_2") as c:
-                c.attr(
-                    style="filled",
-                    color=graph_color,
-                    name="machine_learning",
-                    label="Machine Learning",
-                )
-                c.node_attr.update(
-                    style="filled",
-                    color=table_border_color,
-                    fillcolor=table_background_color,
-                    shape="plaintext",
-                    margin="0",
-                )
-                c.node(
-                    name="ml_parameters",
-                    label=f"""<
-                    <table border="0" cellborder="1" cellspacing="0">
-                        <tr>
-                            <td colspan="2"><b>Parameters</b></td>
-                        </tr>
-                        <tr>
-                            <td>epochs</td>
-                            <td>{self.epochs}</td>
-                        </tr>
-                        <tr>
-                            <td>batch size</td>
-                            <td>{self.batch_size}</td>
-                        </tr>
-                        <tr>
-                            <td>optimizer</td>
-                            <td>Adam</td>
-                        </tr>
-                        <tr>
-                            <td>loss</td>
-                            <td>CrossEntropy</td>
-                        </tr>
-                    </table>>""",
-                )
-                c.node(
-                    name="dataset_parameters",
-                    label=f"""<
-                    <table border="0" cellborder="1" cellspacing="0">
-                        <tr>
-                            <td colspan="2"><b>Dataset</b></td>
-                        </tr>
-                        <tr>
-                            <td>size</td>
-                            <td>{len(self.gene_spaces)} * {self.num_runs}</td>
-                        </tr>
-                        <tr>
-                            <td>train</td>
-                            <td>{int((1.0-self.val_size-self.test_size)*100)} %</td>
-                        </tr>
-                        <tr>
-                            <td>val</td>
-                            <td>{int(self.val_size*100)} %</td>
-                        </tr>
-                        <tr>
-                            <td>test</td>
-                            <td>{int(self.test_size*100)} %</td>
-                        </tr>
-                    </table>>""",
-                )
-
-                with c.subgraph(name="cluster_20") as cc:
-                    cc.attr(
-                        style="filled",
-                        color=sub_graph_color,
-                        name="architecture",
-                        label="Model Architecture",
-                    )
-                    cc.node_attr.update(
-                        style="filled",
-                        color=table_border_color,
-                        fillcolor=table_background_color,
-                        shape="plaintext",
-                        margin="0",
-                    )
-                    cc.node(
-                        name="dense_parameters",
-                        label=f"""<
-                        <table border="0" cellborder="1" cellspacing="0">
-                            <tr>
-                                <td colspan="2"><b>Dense</b></td>
-                            </tr>
-                            <tr>
-                                <td>input size</td>
-                                <td>{self.lstm_hidden_dim + self.n_pca_components*self.pop_size}</td>
-                            </tr>
-                            <tr>
-                                <td>output size</td>
-                                <td>{len(self.gene_spaces)}</td>
-                            </tr>
-                        </table>>""",
-                    )
-                    with cc.subgraph(name="cluster_200") as ccc:
-                        ccc.attr(
-                            style="dashed",
-                            color=table_border_color,
-                            name="population",
-                            label="Data loader",
-                        )
-                        ccc.node_attr.update(
-                            style="filled",
-                            color=table_border_color,
-                            fillcolor=table_background_color,
-                            shape="box",
-                        )
-                        ccc.node(
-                            name="indiv_metrics_loader",
-                            color=table_border_color,
-                            label="Indiv Metrics",
-                            margin="0.1,0,0.1,0",
-                        )
-                        ccc.node(
-                            name="pop_metrics_loader",
-                            color=table_border_color,
-                            label="Pop Metrics",
-                            margin="0.1,0,0.1,0",
-                        )
-                    cc.node(
-                        name="PCA_parameters",
-                        label=f"""<
-                        <table border="0" cellborder="1" cellspacing="0">
-                            <tr>
-                                <td colspan="2"><b>PCA</b></td>
-                            </tr>
-                            <tr>
-                                <td>components</td>
-                                <td>{self.n_pca_components}</td>
-                            </tr>
-                            <tr>
-                                <td>samples</td>
-                                <td>{self.pop_size}</td>
-                            </tr>
-                        </table>>""",
-                    )
-                    cc.node(
-                        name="LSTM_parameters",
-                        label=f"""<
-                        <table border="0" cellborder="1" cellspacing="0">
-                            <tr>
-                                <td colspan="2"><b>LSTM</b></td>
-                            </tr>
-                            <tr>
-                                <td>input size</td>
-                                <td>{0 if self.pop_diversity_metrics is None else len(self.pop_diversity_metrics)}</td>
-                            </tr>
-                            <tr>
-                                <td>hidden size</td>
-                                <td>{self.lstm_hidden_dim}</td>
-                            </tr>
-                            <tr>
-                                <td>layers</td>
-                                <td>{self.lstm_num_layers}</td>
-                            </tr>
-                            <tr>
-                                <td>dropout</td>
-                                <td>{self.lstm_dropout}</td>
-                            </tr>
-                        </table>>""",
-                    )
-
-                    cc.edge(
-                        "LSTM_parameters",
-                        "dense_parameters",
-                        label=f"{self.lstm_hidden_dim}",
-                    )
-                    cc.edge(
-                        "PCA_parameters",
-                        "dense_parameters",
-                        label=f"{self.n_pca_components*self.pop_size}",
-                    )
-                    cc.edge("pop_metrics_loader", "LSTM_parameters")
-                    cc.edge("indiv_metrics_loader", "PCA_parameters")
-
         with gv.subgraph(name="cluster_3") as c:
             c.attr(
                 style="dashed",
@@ -1055,14 +728,8 @@ class MetaGA:
 
         gv.edge(
             tail_name="combined_gene_space",
-            head_name=(
-                "pop_metrics"
-                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
-                else "optimization_parameters"
-            ),
-            label=f""" for each {
-                'algorithm per ' if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY else ''
-                } \nsolution""",
+            head_name="optimization_parameters",
+            label="for each \nsolution",
             lhead="cluster_1",
         )
         gv.edge(
@@ -1071,33 +738,15 @@ class MetaGA:
             ltail="cluster_1",
             lhead="cluster_3",
         )
-        if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY:
-            gv.edge(
-                tail_name="pop_scheme",
-                head_name="dataset_parameters",
-                ltail="cluster_3",
-            )
         gv.edge(
-            tail_name=(
-                "PCA_parameters"
-                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
-                else "optimization_parameters"
-            ),
+            tail_name="optimization_parameters",
             head_name="combined_gene_space:gene_fitness",
             label=(
-                " model accuracy\non test dataset"
-                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
-                else (
-                    "average fitness \nof runs"
-                    if self.fitness_function_type == MetaGAFitnessFunction.PARAMETER_TUNING
-                    else "cosine distance \nof average feature vectors\nof target and optimized algorithm"
-                )
+                "average fitness \nof runs"
+                if self.fitness_function_type == MetaGAFitnessFunction.PARAMETER_TUNING
+                else "cosine distance \nof average feature vectors\nof target and optimized algorithm"
             ),
-            ltail=(
-                "cluster_2"
-                if self.fitness_function_type == MetaGAFitnessFunction.PERFORMANCE_SIMILARITY
-                else "cluster_1"
-            ),
+            ltail="cluster_1",
         )
 
         gv.attr(fontsize="25")

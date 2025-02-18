@@ -26,20 +26,6 @@ INDIV_DIVERSITY_METRICS = [
     IndivDiversityMetric.IFIQR,
 ]
 
-
-"""
-Machine learning parameters
-"""
-BATCH_SIZE = 20
-EPOCHS = 100
-N_PCA_COMPONENTS = 3
-LSTM_NUM_LAYERS = 3
-LSTM_HIDDEN_DIM = 128
-LSTM_DROPOUT = 0.2
-VAL_SIZE = 0.2
-TEST_SIZE = 0.2
-
-
 """
 Metaheuristic similarity analyzer parameters
 """
