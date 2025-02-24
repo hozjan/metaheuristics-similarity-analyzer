@@ -5,13 +5,12 @@ from numba import jit
 import numpy as np
 
 from niapy.algorithms.algorithm import Algorithm
-from niapy.util.distances import euclidean
 
-__all__ = ['FireflyAlgorithm']
+__all__ = ["FireflyAlgorithm"]
 
 logging.basicConfig()
-logger = logging.getLogger('niapy.algorithms.basic')
-logger.setLevel('INFO')
+logger = logging.getLogger("niapy.algorithms.basic")
+logger.setLevel("INFO")
 
 
 class FireflyAlgorithm(Algorithm):
@@ -45,7 +44,7 @@ class FireflyAlgorithm(Algorithm):
 
     """
 
-    Name = ['FireflyAlgorithm', 'FA']
+    Name = ["FireflyAlgorithm", "FA"]
 
     @staticmethod
     def info():
@@ -58,7 +57,8 @@ class FireflyAlgorithm(Algorithm):
             * :func:`niapy.algorithms.Algorithm.info`
 
         """
-        return r"""Fister, I., Fister Jr, I., Yang, X. S., & Brest, J. (2013). A comprehensive review of firefly algorithms. Swarm and Evolutionary Computation, 13, 34-46."""
+        return r"""Fister, I., Fister Jr, I., Yang, X. S., & Brest, J. (2013). A comprehensive review of firefly
+        algorithms. Swarm and Evolutionary Computation, 13, 34-46."""
 
     def __init__(self, population_size=20, alpha=1, beta0=1, gamma=0.01, theta=0.97, *args, **kwargs):
         """Initialize FireflyAlgorithm.
@@ -108,12 +108,14 @@ class FireflyAlgorithm(Algorithm):
 
         """
         params = super().get_parameters()
-        params.update({
-            'alpha': self.alpha,
-            'beta0': self.beta0,
-            'gamma': self.gamma,
-            'theta': self.theta,
-        })
+        params.update(
+            {
+                "alpha": self.alpha,
+                "beta0": self.beta0,
+                "gamma": self.gamma,
+                "theta": self.theta,
+            }
+        )
         return params
 
     def init_population(self, task):
@@ -137,21 +139,22 @@ class FireflyAlgorithm(Algorithm):
         sorted_idx = np.argsort(intensity)
         intensity = intensity[sorted_idx]
         fireflies = fireflies[sorted_idx]
-        return fireflies, intensity, {'alpha': self.alpha}
-    
+        return fireflies, intensity, {"alpha": self.alpha}
+
     @jit(nopython=True, cache=True)
-    def move_fa(dimension, space_range, lower, upper, population, population_fitness, alpha, beta0, gamma, population_size):
+    def move_fa(
+        dimension, space_range, lower, upper, population, population_fitness, alpha, beta0, gamma, population_size
+    ):
         for i in range(0, population_size):
             for j in range(0, population_size):
                 if population_fitness[i] > population_fitness[j]:
                     r = np.linalg.norm((population[i] - population[j]))
-                    beta = beta0 * np.exp(-gamma * r ** 2)
+                    beta = beta0 * np.exp(-gamma * r**2)
                     steps = alpha * (np.random.rand(dimension) - 0.5) * space_range
                     population[i] = population[i] + beta * (population[j] - population[i]) + steps
                     population[i] = np.clip(population[i], lower, upper)
                 else:
                     break
-
 
     def run_iteration(self, task, population, population_fitness, best_x, best_fitness, **params):
         r"""Core function of Firefly Algorithm.
@@ -177,17 +180,28 @@ class FireflyAlgorithm(Algorithm):
             * :func:`niapy.algorithms.basic.FireflyAlgorithm.move_ffa`
 
         """
-        alpha = params.pop('alpha') * self.theta
-        
-        FireflyAlgorithm.move_fa(task.dimension, task.range, task.lower, task.upper, population, population_fitness, alpha, self.beta0, self.gamma, self.population_size)
+        alpha = params.pop("alpha") * self.theta
+
+        FireflyAlgorithm.move_fa(
+            task.dimension,
+            task.range,
+            task.lower,
+            task.upper,
+            population,
+            population_fitness,
+            alpha,
+            self.beta0,
+            self.gamma,
+            self.population_size,
+        )
 
         for i in range(self.population_size):
             population_fitness[i] = task.eval(population[i])
-        
+
         best_x, best_fitness = self.get_best(population, population_fitness, best_x, best_fitness)
 
         sorted_idx = np.argsort(population_fitness)
         population_fitness = population_fitness[sorted_idx]
         population = population[sorted_idx]
 
-        return population, population_fitness, best_x, best_fitness, {'alpha': alpha, 'sorted_idx' : sorted_idx}
+        return population, population_fitness, best_x, best_fitness, {"alpha": alpha, "sorted_idx": sorted_idx}

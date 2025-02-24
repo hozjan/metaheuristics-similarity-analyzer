@@ -2,16 +2,16 @@
 
 """Implementation of problems utility function."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 import logging
 from niapy.util.array import full_array
 from niapy.problems import Problem as Problem_niapy
 
 logging.basicConfig()
-logger = logging.getLogger('niapy.problems.problem')
-logger.setLevel('INFO')
+logger = logging.getLogger("niapy.problems.problem")
+logger.setLevel("INFO")
 
-__all__ = ['Problem']
+__all__ = ["Problem"]
 
 
 class Problem(Problem_niapy):
@@ -55,7 +55,7 @@ class Problem(Problem_niapy):
 
         """
         if x.shape[0] != self.dimension:
-            raise ValueError('Dimensions do not match. {} != {}'.format(x.shape[0], self.dimension))
+            raise ValueError("Dimensions do not match. {} != {}".format(x.shape[0], self.dimension))
 
         return self._evaluate(x)
 

@@ -1,9 +1,6 @@
-from util.indiv_diversity_metrics import IndivDiversityMetric
-from util.pop_diversity_metrics import PopDiversityMetric
-from tools.problems.schwefel import Schwefel
-from tools.algorithms.fa import FireflyAlgorithm
-from tools.algorithms.pso import ParticleSwarmAlgorithm
-import numpy as np
+from msa.util.indiv_diversity_metrics import IndivDiversityMetric
+from msa.util.pop_diversity_metrics import PopDiversityMetric
+from msa.problems.schwefel import Schwefel
 
 
 RNG_SEED = 42
@@ -29,20 +26,6 @@ INDIV_DIVERSITY_METRICS = [
     IndivDiversityMetric.IFIQR,
 ]
 
-
-"""
-Machine learning parameters
-"""
-BATCH_SIZE = 20
-EPOCHS = 100
-N_PCA_COMPONENTS = 3
-LSTM_NUM_LAYERS = 3
-LSTM_HIDDEN_DIM = 128
-LSTM_DROPOUT = 0.2
-VAL_SIZE = 0.2
-TEST_SIZE = 0.2
-
-
 """
 Metaheuristic similarity analyzer parameters
 """
@@ -62,7 +45,7 @@ META_GA_MUTATION_NUM_GENES = 1
 META_GA_MUTATION_TYPE = "random"
 META_GA_KEEP_ELITISM = 1
 
-# problem, algorithm and parameter names must match those from the niapy library
+# problem, algorithm and parameter names must match those from the niapy framework
 OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
 """
 GENE_SPACES = {

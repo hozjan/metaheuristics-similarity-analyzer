@@ -3,9 +3,9 @@
 """Implementations of Schwefel's functions."""
 
 import numpy as np
-from tools.problems.problem import Problem
+from msa.problems.problem import Problem
 
-__all__ = ['Schwefel', 'Schwefel221', 'Schwefel222', 'ModifiedSchwefel']
+__all__ = ["Schwefel", "Schwefel221", "Schwefel222", "ModifiedSchwefel"]
 
 
 class Schwefel(Problem):
@@ -66,7 +66,7 @@ class Schwefel(Problem):
             str: Latex code.
 
         """
-        return r'''$f(\textbf{x}) = 418.9829d - \sum_{i=1}^{D} x_i \sin(\sqrt{\lvert x_i \rvert})$'''
+        return r"""$f(\textbf{x}) = 418.9829d - \sum_{i=1}^{D} x_i \sin(\sqrt{\lvert x_i \rvert})$"""
 
     def _evaluate(self, x):
         return 418.982887272433799807913601398 * self.dimension - np.sum(x * np.sin(np.sqrt(np.abs(x))))
@@ -131,7 +131,7 @@ class Schwefel221(Problem):
             str: Latex code.
 
         """
-        return r'''$f(\mathbf{x})=\max_{i=1,...,D} \lvert x_i \rvert$'''
+        return r"""$f(\mathbf{x})=\max_{i=1,...,D} \lvert x_i \rvert$"""
 
     def _evaluate(self, x):
         return np.amax(np.abs(x))
@@ -161,7 +161,8 @@ class Schwefel222(Problem):
             $f(\mathbf{x})=\sum_{i=1}^{D} \lvert x_i \rvert +\prod_{i=1}^{D} \lvert x_i \rvert$
 
         Equation:
-            \begin{equation}f(\mathbf{x}) = \sum_{i=1}^{D} \lvert x_i \rvert + \prod_{i=1}^{D} \lvert x_i \rvert \end{equation}
+            \begin{equation}f(\mathbf{x}) = \sum_{i=1}^{D} \lvert x_i \rvert + \prod_{i=1}^{D} \lvert x_i
+            \rvert \end{equation}
 
         Domain:
             $-100 \leq x_i \leq 100$
@@ -196,7 +197,7 @@ class Schwefel222(Problem):
             str: Latex code.
 
         """
-        return r'''$f(\mathbf{x})=\sum_{i=1}^{D} \lvert x_i \rvert +\prod_{i=1}^{D} \lvert x_i \rvert$'''
+        return r"""$f(\mathbf{x})=\sum_{i=1}^{D} \lvert x_i \rvert +\prod_{i=1}^{D} \lvert x_i \rvert$"""
 
     def _evaluate(self, x):
         return np.sum(np.abs(x)) + np.prod(np.abs(x))
@@ -214,7 +215,12 @@ class ModifiedSchwefel(Problem):
     Function:
     **Modified Schwefel Function**
 
-        :math:`f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\ h(x) = g(x + 420.9687462275036)  \\ g(z) = \begin{cases} z \sin \left( \lvert z \rvert^{\frac{1}{2}} \right) &\quad \lvert z \rvert \leq 500 \\ \left( 500 - \mod (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod (z, 500) \rvert} \right) - \frac{ \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\ \left( \mod (\lvert z \rvert, 500) - 500 \right) \sin \left( \sqrt{\lvert \mod (\lvert z \rvert, 500) - 500 \rvert} \right) + \frac{ \left( z - 500 \right)^2 }{ 10000 D } &\quad z < -500\end{cases}`
+        :math:`f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\ h(x) = g(x + 420.9687462275036)  \\ g(z) =
+            \begin{cases} z \sin \left( \lvert z \rvert^{\frac{1}{2}} \right) &\quad \lvert z \rvert \leq 500 \\
+            \left( 500 - \mod (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod (z, 500) \rvert} \right) - \frac{
+            \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\ \left( \mod (\lvert z \rvert, 500) - 500 \right)
+            \sin \left( \sqrt{\lvert \mod (\lvert z \rvert, 500) - 500 \rvert} \right)
+            + \frac{ \left( z - 500 \right)^2 }{ 10000 D } &\quad z < -500\end{cases}`
 
         **Input domain:**
         The function can be defined on any input domain but it is usually
@@ -224,10 +230,22 @@ class ModifiedSchwefel(Problem):
 
     LaTeX formats:
         Inline:
-            $f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\ h(x) = g(x + 420.9687462275036)  \\ g(z) = \begin{cases} z \sin \left( \lvert z \rvert^{\frac{1}{2}} \right) &\quad \lvert z \rvert \leq 500 \\ \left( 500 - \mod (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod (z, 500) \rvert} \right) - \frac{ \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\ \left( \mod (\lvert z \rvert, 500) - 500 \right) \sin \left( \sqrt{\lvert \mod (\lvert z \rvert, 500) - 500 \rvert} \right) + \frac{ \left( z - 500 \right)^2 }{ 10000 D } &\quad z < -500\end{cases}$
+            $f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\ h(x) = g(x + 420.9687462275036)
+            \\ g(z) = \begin{cases} z \sin \left( \lvert z \rvert^{\frac{1}{2}} \right) &\quad \lvert z
+            \rvert \leq 500 \\ \left( 500 - \mod (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod
+            (z, 500) \rvert} \right) - \frac{ \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\
+            \left( \mod (\lvert z \rvert, 500) - 500 \right) \sin \left( \sqrt{\lvert \mod
+            (\lvert z \rvert, 500) - 500 \rvert} \right) + \frac{ \left( z - 500 \right)^2 }{ 10000 D }
+            &\quad z < -500\end{cases}$
 
         Equation:
-            \begin{equation} f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\ h(x) = g(x + 420.9687462275036)  \\ g(z) = \begin{cases} z \sin \left( \lvert z \rvert^{\frac{1}{2}} \right) &\quad \lvert z \rvert \leq 500 \\ \left( 500 - \mod (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod (z, 500) \rvert} \right) - \frac{ \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\ \left( \mod (\lvert z \rvert, 500) - 500 \right) \sin \left( \sqrt{\lvert \mod (\lvert z \rvert, 500) - 500 \rvert} \right) + \frac{ \left( z - 500 \right)^2 }{ 10000 D } &\quad z < -500\end{cases} \end{equation}
+            \begin{equation} f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\
+            h(x)= g(x + 420.9687462275036)  \\ g(z) = \begin{cases} z \sin \left( \lvert z
+            \rvert^{\frac{1}{2}} \right) &\quad \lvert z \rvert \leq 500 \\ \left( 500 - \mod
+            (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod (z, 500) \rvert} \right) - \frac{
+            \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\ \left( \mod (\lvert z \rvert, 500)
+            - 500 \right) \sin \left( \sqrt{\lvert \mod (\lvert z \rvert, 500) - 500 \rvert} \right)
+            + \frac{ \left( z - 500 \right)^2 }{ 10000 D } &\quad z < -500\end{cases} \end{equation}
 
         Domain:
             $-100 \leq x_i \leq 100$
@@ -259,14 +277,21 @@ class ModifiedSchwefel(Problem):
             str: Latex code.
 
         """
-        return r'''$f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\ h(x) = g(x + 420.9687462275036)  \\ g(z) = \begin{cases} z \sin \left( \lvert z \rvert^{\frac{1}{2}} \right) &\quad \lvert z \rvert \leq 500 \\ \left( 500 - \mod (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod (z, 500) \rvert} \right) - \frac{ \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\ \left( \mod (\lvert z \rvert, 500) - 500 \right) \sin \left( \sqrt{\lvert \mod (\lvert z \rvert, 500) - 500 \rvert} \right) + \frac{ \left( z - 500 \right)^2 }{ 10000 D } &\quad z < -500\end{cases}$'''
+        return r"""$f(\textbf{x}) = 418.9829 \cdot D - \sum_{i=1}^D h(x_i) \\ h(x) = g(x + 420.9687462275036)
+            \\ g(z) = \begin{cases} z \sin \left( \lvert z \rvert^{\frac{1}{2}} \right) &\quad \lvert z \rvert
+            \leq 500 \\ \left( 500 - \mod (z, 500) \right) \sin \left( \sqrt{\lvert 500 - \mod (z, 500) \rvert} \right)
+            - \frac{ \left( z - 500 \right)^2 }{ 10000 D }  &\quad z > 500 \\ \left( \mod (\lvert z \rvert, 500) - 500
+            \right) \sin \left( \sqrt{\lvert \mod (\lvert z \rvert, 500) - 500 \rvert} \right) + \frac{ \left( z - 500
+            \right)^2 }{ 10000 D } &\quad z < -500\end{cases}$"""
 
     def _evaluate(self, x):
         xx = x + 420.9687462275036
         conditions = [x > 500.0, x < -500.0]
         xx_mod = np.fmod(xx, 500.0)
-        choices = [(500.0 - xx_mod) * np.sin(np.sqrt(np.abs(500.0 - xx_mod))) - (xx - 500.0) ** 2 / (10000 * self.dimension),
-                   (xx_mod - 500.0) * np.sin(np.sqrt(np.abs(xx_mod - 500.0))) + (xx - 500.0) ** 2 / (10000 * self.dimension)]
+        choices = [
+            (500.0 - xx_mod) * np.sin(np.sqrt(np.abs(500.0 - xx_mod))) - (xx - 500.0) ** 2 / (10000 * self.dimension),
+            (xx_mod - 500.0) * np.sin(np.sqrt(np.abs(xx_mod - 500.0))) + (xx - 500.0) ** 2 / (10000 * self.dimension),
+        ]
         default = xx * np.sin(np.sqrt(np.abs(xx)))
         val = np.sum(np.select(conditions, choices, default=default))
         return 418.9829 * self.dimension - val
