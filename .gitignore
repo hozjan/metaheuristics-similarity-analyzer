@@ -1,7 +1,6 @@
 *
 !msa
 !msa/__init__.py
-!metaheuristics_similarity_analyzer.ipynb
 !msa/util
 !msa/util/optimization_data.py
 !msa/util/pop_diversity_metrics.py
@@ -24,4 +23,5 @@
 !msa/problems/schwefel.py
 !msa/problems/__init__.py
 !pyproject.toml
+!LICENSE
 !.gitignore
