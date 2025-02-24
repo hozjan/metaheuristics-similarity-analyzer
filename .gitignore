@@ -24,4 +24,5 @@
 !msa/problems/schwefel.py
 !msa/problems/__init__.py
 !pyproject.toml
+!LICENSE
 !.gitignore
