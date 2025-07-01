@@ -14,7 +14,7 @@ MAX_EVALS = 10000  # per run
 NUM_RUNS = 30  # per algorithm
 # metrics to calculate when performing optimization
 POP_DIVERSITY_METRICS = [
-    PopDiversityMetric.PDC,
+    PopDiversityMetric.DPC,
     PopDiversityMetric.FDC,
     PopDiversityMetric.PFSD,
     PopDiversityMetric.PFM,
