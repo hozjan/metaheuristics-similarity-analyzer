@@ -11,7 +11,7 @@ from sklearn.decomposition import PCA
 import math
 from msa.util.helper import smape
 from msa.util.indiv_diversity_metrics import IDT, ISI, IFM, IFIQR, IndivDiversityMetric
-from msa.util.pop_diversity_metrics import PDC, PED, PMD, AAD, PDI, FDC, PFSD, PFM, PopDiversityMetric
+from msa.util.pop_diversity_metrics import DPC, PED, PMD, AAD, PDI, FDC, PFSD, PFM, PopDiversityMetric
 
 __all__ = ["PopulationData", "SingleRunData", "JsonEncoder"]
 
@@ -73,8 +73,8 @@ class PopulationData:
 
         for metric in metrics:
             match metric:
-                case PopDiversityMetric.PDC:
-                    self.metrics_values[metric.value] = PDC(self.population, problem)
+                case PopDiversityMetric.DPC:
+                    self.metrics_values[metric.value] = DPC(self.population, problem)
                 case PopDiversityMetric.PED:
                     self.metrics_values[metric.value] = PED(self.population)
                 case PopDiversityMetric.PMD:

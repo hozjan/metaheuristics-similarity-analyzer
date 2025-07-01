@@ -6,11 +6,11 @@ from niapy.problems import Problem
 from niapy.util.distances import euclidean
 import itertools
 
-__all__ = ["PDC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFM", "PopDiversityMetric"]
+__all__ = ["DPC", "PED", "PMD", "AAD", "PDI", "FDC", "PFSD", "PFM", "PopDiversityMetric"]
 
 
 class PopDiversityMetric(Enum):
-    PDC = "PDC"
+    DPC = "DPC"
     PED = "PED"
     PMD = "PMD"
     AAD = "AAD"
@@ -20,7 +20,7 @@ class PopDiversityMetric(Enum):
     PFM = "PFM"
 
 
-def PDC(population: npt.NDArray, problem: Problem):
+def DPC(population: npt.NDArray, problem: Problem):
     r"""Distance to Population Centroid.
 
     Reference paper:
@@ -31,7 +31,7 @@ def PDC(population: npt.NDArray, problem: Problem):
         problem (Problem): Optimization problem.
 
     Returns:
-        PDC value.
+        DPC value.
 
     """
     P, N = np.shape(population)
@@ -41,9 +41,9 @@ def PDC(population: npt.NDArray, problem: Problem):
     avg_point = np.mean(population, axis=0)
 
     distances = np.linalg.norm(population - list(itertools.repeat(avg_point, P)), axis=1)
-    pdc = np.sum(distances, axis=0)
+    dpc = np.sum(distances, axis=0)
 
-    return pdc / (P * L)
+    return dpc / (P * L)
 
 
 def PED(population: npt.NDArray):
