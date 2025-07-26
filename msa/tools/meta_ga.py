@@ -6,15 +6,13 @@ from pathlib import Path
 import numpy as np
 import pygad
 from msa.tools.optimization_tools import optimization_runner
-from msa.util.optimization_data import SingleRunData
+from msa.tools.optimization_data import SingleRunData, IndivDiversityMetric, PopDiversityMetric
 from msa.util.helper import get_algorithm_by_name
 import shutil
 import logging
 import graphviz
 from enum import Enum
 import os
-from msa.util.pop_diversity_metrics import PopDiversityMetric
-from msa.util.indiv_diversity_metrics import IndivDiversityMetric
 
 
 class MetaGAFitnessFunction(Enum):

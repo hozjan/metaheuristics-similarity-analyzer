@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 import os
 import numpy as np
 
-from msa.util.optimization_data import SingleRunData
+from msa.tools.optimization_data import SingleRunData
 
 __all__ = ["svm_and_knn_classification"]
 

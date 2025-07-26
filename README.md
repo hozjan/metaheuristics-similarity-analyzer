@@ -25,20 +25,29 @@ BA_gene_spaces = {
 We also have to chose diversity metrics which will be used as the basis of the analysis.
 
 ```python
-from msa.util.pop_diversity_metrics import PopDiversityMetric
-from msa.util.indiv_diversity_metrics import IndivDiversityMetric
+from msa.diversity_metrics.population_diversity.dpc import DPC
+from msa.diversity_metrics.population_diversity.fdc import FDC
+from msa.diversity_metrics.population_diversity.pfsd import PFSD
+from msa.diversity_metrics.population_diversity.pfm import PFM
+from msa.diversity_metrics.individual_diversity.idt import IDT
+from msa.diversity_metrics.individual_diversity.isi import ISI
+from msa.diversity_metrics.individual_diversity.ifm import IFM
+from msa.diversity_metrics.individual_diversity.ifiqr import IFIQR
+from msa.problems.schwefel import Schwefel
+
+OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
 
 POP_DIVERSITY_METRICS = [
-    PopDiversityMetric.PDC,
-    PopDiversityMetric.FDC,
-    PopDiversityMetric.PFSD,
-    PopDiversityMetric.PFM,
+    DPC(OPTIMIZATION_PROBLEM),
+    FDC(OPTIMIZATION_PROBLEM, [420.968746], True),
+    PFSD(),
+    PFM(),
 ]
 INDIV_DIVERSITY_METRICS = [
-    IndivDiversityMetric.IDT,
-    IndivDiversityMetric.ISI,
-    IndivDiversityMetric.IFM,
-    IndivDiversityMetric.IFIQR,
+    IDT(),
+    ISI(),
+    IFM(),
+    IFIQR(),
 ]
 ```
 
