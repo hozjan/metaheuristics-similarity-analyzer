@@ -1,9 +1,17 @@
-from msa.util.indiv_diversity_metrics import IndivDiversityMetric
-from msa.util.pop_diversity_metrics import PopDiversityMetric
-from msa.problems.schwefel import Schwefel
-
+from msa.diversity_metrics.population_diversity.dpc import DPC
+from msa.diversity_metrics.population_diversity.fdc import FDC
+from msa.diversity_metrics.population_diversity.pfsd import PFSD
+from msa.diversity_metrics.population_diversity.pfm import PFM
+from msa.diversity_metrics.individual_diversity.idt import IDT
+from msa.diversity_metrics.individual_diversity.isi import ISI
+from msa.diversity_metrics.individual_diversity.ifm import IFM
+from msa.diversity_metrics.individual_diversity.ifiqr import IFIQR
+from niapy.problems.schwefel import Schwefel
 
 RNG_SEED = 42
+
+# problem, algorithm and parameter names must match those from the niapy framework
+OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
 
 """
 Optimization parameters
@@ -12,18 +20,19 @@ DATASET_PATH = "./dataset"
 POP_SIZE = 30
 MAX_EVALS = 10000  # per run
 NUM_RUNS = 30  # per algorithm
+
 # metrics to calculate when performing optimization
 POP_DIVERSITY_METRICS = [
-    PopDiversityMetric.DPC,
-    PopDiversityMetric.FDC,
-    PopDiversityMetric.PFSD,
-    PopDiversityMetric.PFM,
+    DPC(OPTIMIZATION_PROBLEM),
+    FDC(OPTIMIZATION_PROBLEM, [420.968746], True),
+    PFSD(),
+    PFM(),
 ]
 INDIV_DIVERSITY_METRICS = [
-    IndivDiversityMetric.IDT,
-    IndivDiversityMetric.ISI,
-    IndivDiversityMetric.IFM,
-    IndivDiversityMetric.IFIQR,
+    IDT(),
+    ISI(),
+    IFM(),
+    IFIQR(),
 ]
 
 """
@@ -45,8 +54,6 @@ META_GA_MUTATION_NUM_GENES = 1
 META_GA_MUTATION_TYPE = "random"
 META_GA_KEEP_ELITISM = 1
 
-# problem, algorithm and parameter names must match those from the niapy framework
-OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
 """
 GENE_SPACES = {
     FireflyAlgorithm: {

@@ -1,10 +1,7 @@
-"""Python micro framework for measuring similarity of the meta-heuristic search strategies."""
+"""Python micro framework for measuring similarity of the metaheuristic search strategies."""
 
-from msa import algorithms, problems, tools, util
+from msa import algorithms, tools, util, diversity_metrics
 
-__all__ = [
-    "algorithms",
-    "problems",
-    "tools",
-    "util",
-]
+__all__ = ["algorithms", "tools", "util", "diversity_metrics"]
+
+__project__ = "MSA"

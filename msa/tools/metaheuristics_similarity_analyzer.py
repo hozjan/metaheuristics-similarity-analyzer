@@ -9,7 +9,7 @@ from msa.util.helper import random_float_with_step, get_algorithm_by_name
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from msa.tools.optimization_tools import optimization_runner
 from msa.tools.ml_tools import svm_and_knn_classification
-from msa.util.optimization_data import SingleRunData
+from msa.tools.optimization_data import SingleRunData
 import numpy as np
 import numpy.typing as npt
 from scipy import spatial, stats
@@ -17,11 +17,11 @@ import graphviz
 import cloudpickle
 from niapy.algorithms import Algorithm
 
-__all__ = ["MetaheuristicSimilarityAnalyzer"]
+__all__ = ["MetaheuristicsSimilarityAnalyzer"]
 
 
-class MetaheuristicSimilarityAnalyzer:
-    r"""Class for search and analysis of similarity of metaheuristic with
+class MetaheuristicsSimilarityAnalyzer:
+    r"""Class for search and analysis of similarity of metaheuristics with
     different parameter settings. Uses target metaheuristic with stochastically
     selected parameters and aims to find parameters of the optimized
     metaheuristic with which they perform in a similar maner.
@@ -281,6 +281,7 @@ class MetaheuristicSimilarityAnalyzer:
         generate_dataset: bool = False,
         calculate_similarity_metrics: bool = False,
         export: bool = False,
+        pkl_filename: str = "msa_obj"
     ):
         r"""Run metaheuristic similarity analysis.
 
@@ -304,6 +305,8 @@ class MetaheuristicSimilarityAnalyzer:
                 after analysis (false by default). Has no effect if
                 `generate_dataset` is false.
             export (Optional[bool]): Export MSA object to pkl after analysis.
+            pkl_filename (Optional[str]): Filename of the exported .pkl file.
+                Used if `export` is true.
 
         Raises:
             ValueError: `meta_ga` not defined or `fitness_function_type`
@@ -351,7 +354,7 @@ class MetaheuristicSimilarityAnalyzer:
                 self.calculate_similarity_metrics()
         if export:
             print("Exporting .pkl file...")
-            self.export_to_pkl("msa_obj")
+            self.export_to_pkl(pkl_filename)
 
         print("All done!")
 
@@ -458,6 +461,7 @@ class MetaheuristicSimilarityAnalyzer:
                 )
             )
 
+    # TODO combine tables
     def get_hyperparameters_latex_table(self):
         r"""Create latex table displaying hyperparameters settings of target and optimized metaheuristic.
 
@@ -554,11 +558,12 @@ class MetaheuristicSimilarityAnalyzer:
             + " *{1}{>{\centering\\arraybackslash}m{.1\paperwidth}}"
         )
         similarity_metrics_table.add_hline()
+
         similarity_metrics_table.add_row(
             (
                 "c.n.",
-                " 1-SMAPE ",
-                " cos.sim. ",
+                " $Sim_{\mathit{SMAPE}}$ ",
+                " $Sim_{\mathit{cos}}$ ",
                 " rho ",
                 " 1-accuracy (SVM) ",
                 " 1-accuracy (KNN)",
@@ -996,7 +1001,7 @@ class MetaheuristicSimilarityAnalyzer:
                 )
                 if self.meta_ga.pop_diversity_metrics is not None:
                     for pop_metric in self.meta_ga.pop_diversity_metrics:
-                        pop_metrics_label += f"""<tr><td>{pop_metric.value}</td></tr>"""
+                        pop_metrics_label += f"""<tr><td>{pop_metric.abbreviation()}</td></tr>"""
                 pop_metrics_label += "</table>>"
                 cc.node(name="pop_metrics", label=pop_metrics_label)
 
@@ -1005,7 +1010,7 @@ class MetaheuristicSimilarityAnalyzer:
                 )
                 if self.meta_ga.indiv_diversity_metrics is not None:
                     for indiv_metric in self.meta_ga.indiv_diversity_metrics:
-                        indiv_metrics_label += f"""<tr><td>{indiv_metric.value}</td></tr>"""
+                        indiv_metrics_label += f"""<tr><td>{indiv_metric.abbreviation()}</td></tr>"""
                 indiv_metrics_label += "</table>>"
                 cc.node(name="indiv_metrics", label=indiv_metrics_label)
 
