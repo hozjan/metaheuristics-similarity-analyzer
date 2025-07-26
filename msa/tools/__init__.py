@@ -1,7 +1,7 @@
 """Module containing useful tools of the MSA"""
 
 from msa.tools.meta_ga import MetaGA
-from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer as MSA
+from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
 from msa.tools.ml_tools import (
     svm_and_knn_classification,
 )
@@ -16,7 +16,7 @@ from msa.tools.optimization_data import (
 
 __all__ = [
     "MetaGA",
-    "MSA",
+    "MetaheuristicsSimilarityAnalyzer",
     "svm_and_knn_classification",
     "optimization",
     "optimization_worker",
