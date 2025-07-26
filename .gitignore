@@ -44,6 +44,21 @@
 !msa/diversity_metrics/population_diversity/pfsd.py
 !msa/diversity_metrics/population_diversity/pmd.py
 
+!tests
+!tests/__init__.py
+!tests/test_parameter_tuning.py
+!tests/test_similarity_analisys.py
+!tests/diversity_metrics_tests
+!tests/diversity_metrics_tests/__init__.py
+!tests/diversity_metrics_tests/test_individual_metrics.py
+!tests/diversity_metrics_tests/test_population_metrics.py
+!tests/diversity_metrics_tests/util
+!tests/diversity_metrics_tests/util/__init__.py
+!tests/diversity_metrics_tests/util/optimization_data.py
+
+!.github
+!.github/workflows
+!.github/workflows/main.yaml
 !pyproject.toml
 !LICENSE
 !.gitignore

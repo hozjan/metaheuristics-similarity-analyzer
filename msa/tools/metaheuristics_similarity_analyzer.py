@@ -562,8 +562,8 @@ class MetaheuristicsSimilarityAnalyzer:
         similarity_metrics_table.add_row(
             (
                 "c.n.",
-                " $Sim_{\mathit{SMAPE}}$ ",
-                " $Sim_{\mathit{cos}}$ ",
+                " 1-SMAPE ",
+                " cosim ",
                 " rho ",
                 " 1-accuracy (SVM) ",
                 " 1-accuracy (KNN)",
