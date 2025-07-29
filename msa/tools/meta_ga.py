@@ -26,6 +26,8 @@ __all__ = ["MetaGA"]
 class MetaGA:
     r"""Class containing metadata of meta genetic algorithm."""
 
+    # TODO add attributes
+
     def __init__(
         self,
         fitness_function_type: MetaGAFitnessFunction,
@@ -125,11 +127,11 @@ class MetaGA:
         self.high_ranges: list[float] = []
         self.random_mutation_min_val: list[float] = []
         self.random_mutation_max_val: list[float] = []
+        self.archive_path = ""
         self.__fitness_function = None
         self.__algorithms: list[str] = []
         self.__target_algorithm: Algorithm | None = None
         self.__meta_dataset = "meta_dataset"
-        self.__archive_path = ""
         self.__meta_ga_tmp_data_path = ""
         self.__init_parameters()
 
@@ -188,19 +190,19 @@ class MetaGA:
         """
         if prefix is None:
             prefix = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
-        self.__archive_path = os.path.join(
+        self.archive_path = os.path.join(
             self.base_archive_path,
             "_".join([prefix, *self.__algorithms, self.problem.name()]),
         )
-        self.__meta_ga_tmp_data_path = os.path.join(self.__archive_path, "meta_ga_tmp_data")
-        if os.path.exists(self.__archive_path) is False:
-            Path(self.__archive_path).mkdir(parents=True, exist_ok=True)
+        self.__meta_ga_tmp_data_path = os.path.join(self.archive_path, "meta_ga_tmp_data")
+        if os.path.exists(self.archive_path) is False:
+            Path(self.archive_path).mkdir(parents=True, exist_ok=True)
 
-    def __get_logger(self, filename: str = "meta_ga_log_file"):
+    def __get_logger(self, filename):
         r"""Get logger for meta genetic algorithm. Outputs to file and console.
 
         Args:
-            filename (Optional[str]): Log file name.
+            filename (str): Log file name.
 
         Returns:
             logger (Logger)
@@ -389,6 +391,7 @@ class MetaGA:
         self,
         filename="meta_ga_obj",
         plot_filename="meta_ga_fitness_plot",
+        log_filename="meta_ga_log_file",
         target_algorithm: Algorithm | None = None,
         get_info: bool = False,
         prefix: str | None = None,
@@ -399,6 +402,7 @@ class MetaGA:
         Args:
             filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
             plot_filename (Optional[str]): Name of the fitness plot image file.
+            log_filename (Optional[str]): Name of the generated log file.
             target_algorithm (Optional[Algorithm]): Target algorithm for the performance similarity evaluation.
                 Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
@@ -428,7 +432,7 @@ class MetaGA:
 
         if get_info:
             self.meta_ga_info(
-                filename=os.path.join(self.__archive_path, "meta_ga_info"),
+                filename=os.path.join(self.archive_path, "meta_ga_info"),
             )
 
         num_parents_mating = int(self.ga_solutions_per_pop * (self.ga_percent_parents_mating / 100))
@@ -455,15 +459,15 @@ class MetaGA:
             on_generation=self.on_generation_progress,
             save_best_solutions=True,
             save_solutions=True,
-            logger=self.__get_logger(filename=os.path.join(self.__archive_path, "meta_ga_log_file")),
+            logger=self.__get_logger(filename=os.path.join(self.archive_path, log_filename)),
         )
 
         self.meta_ga.run()
         self.__clean_tmp_data()
 
         self.meta_ga.logger.handlers.clear()
-        self.meta_ga.save(os.path.join(self.__archive_path, filename))
-        self.meta_ga.plot_fitness(save_dir=os.path.join(self.__archive_path, f"{plot_filename}.png"))
+        self.meta_ga.save(os.path.join(self.archive_path, filename))
+        self.meta_ga.plot_fitness(save_dir=os.path.join(self.archive_path, f"{plot_filename}.png"))
         best_solutions = self.meta_ga.best_solutions
         print(f"Best solution: {best_solutions[-1]}")
 

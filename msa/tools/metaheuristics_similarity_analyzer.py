@@ -44,6 +44,8 @@ class MetaheuristicsSimilarityAnalyzer:
     metaheuristic with which they perform in a similar maner.
     """
 
+    # TODO add attributes
+
     def __init__(
         self,
         meta_ga: MetaGA,
@@ -88,8 +90,10 @@ class MetaheuristicsSimilarityAnalyzer:
         self.optimized_alg_abbr = get_algorithm_by_name(list(self.meta_ga.gene_spaces)[0]).Name[1]
         self._base_archive_path = base_archive_path
 
-    def __generate_targets(self, num_comparisons: int, generate_optimized_targets: bool = False):
-        r"""Generate target solutions.
+    def __generate_targets_and_folder_structure(
+        self, num_comparisons: int, generate_optimized_targets: bool = False, prefix: str | None = None
+    ):
+        r"""Generate target solutions and folder structure.
 
         Args:
             generate_optimized_targets (Optional[bool]): Generate target
@@ -97,6 +101,8 @@ class MetaheuristicsSimilarityAnalyzer:
                 random targets.
             num_comparisons (Optional[int]): Number of metaheuristic parameter
                 combinations to analyze during the similarity analysis.
+            prefix (Optional[str]): Use custom prefix for the name of the base
+                folder in structure. Uses current datetime by default.
 
         Raises:
             ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
@@ -114,7 +120,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 high_ranges.append(self.target_gene_space[alg_name][setting]["high"])
                 steps.append(self.target_gene_space[alg_name][setting]["step"])
 
-        self.__create_folder_structure()
+        self.__create_folder_structure(prefix=prefix)
 
         for idx in range(num_comparisons):
             if generate_optimized_targets:
@@ -269,14 +275,20 @@ class MetaheuristicsSimilarityAnalyzer:
                     parallel_processing=True,
                 )
 
-    def __create_folder_structure(self):
-        r"""Create folder structure for metaheuristic similarity analysis."""
-        datetime_now = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
+    def __create_folder_structure(self, prefix: str | None = None):
+        r"""Create folder structure for metaheuristic similarity analysis.
+
+        Args:
+            prefix (Optional[str]): Use custom prefix for the name of the base
+                folder in structure. Uses current datetime by default.
+        """
+        if prefix is None:
+            prefix = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
         self.archive_path = os.path.join(
             self._base_archive_path,
             "_".join(
                 [
-                    datetime_now,
+                    prefix,
                     self.target_alg_abbr,
                     self.meta_ga.problem.name(),
                 ]
@@ -294,6 +306,7 @@ class MetaheuristicsSimilarityAnalyzer:
         get_info: bool = False,
         generate_dataset: bool = False,
         calculate_similarity_metrics: bool = False,
+        prefix: str | None = None,
         export: bool = False,
         pkl_filename: str = "msa_obj",
     ):
@@ -318,6 +331,8 @@ class MetaheuristicsSimilarityAnalyzer:
                 similarity metrics from target and optimized solutions
                 after analysis (false by default). Has no effect if
                 `generate_dataset` is false.
+            prefix (Optional[str]): Use custom prefix for the name of the base
+                folder in structure. Uses current datetime by default.
             export (Optional[bool]): Export MSA object to pkl after analysis.
             pkl_filename (Optional[str]): Filename of the exported .pkl file.
                 Used if `export` is true.
@@ -339,10 +354,10 @@ class MetaheuristicsSimilarityAnalyzer:
             raise ValueError("""None of the `num_comparisons` or `target_solutions` was defined!""")
 
         if target_solutions is None and num_comparisons is not None:
-            self.__generate_targets(num_comparisons, generate_optimized_targets)
+            self.__generate_targets_and_folder_structure(num_comparisons, generate_optimized_targets, prefix)
         elif target_solutions is not None:
             self.target_solutions = target_solutions
-            self.__create_folder_structure()
+            self.__create_folder_structure(prefix=prefix)
 
         self.meta_ga.base_archive_path = self.archive_path
 
@@ -656,9 +671,7 @@ class MetaheuristicsSimilarityAnalyzer:
             hyperparameters_table = self.get_hyperparameters_and_similarity_metrics_latex_table()
             doc.append(hyperparameters_table)
         else:
-            doc.append(
-                "Not able to display the table because similarity metrics were not calculated."
-            )
+            doc.append("Not able to display the table because similarity metrics were not calculated.")
 
         doc.append(Subsection("Comparison of fitness statistics"))
 

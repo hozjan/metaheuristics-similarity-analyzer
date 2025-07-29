@@ -1,6 +1,7 @@
 from unittest import TestCase
 import numpy as np
-import os.path
+import shutil
+import os
 from msa.diversity_metrics.population_diversity.dpc import DPC
 from msa.diversity_metrics.population_diversity.fdc import FDC
 from msa.diversity_metrics.population_diversity.pfsd import PFSD
@@ -48,6 +49,13 @@ INDIV_DIVERSITY_METRICS = [
 
 
 class TestTargetSimilarity(TestCase):
+    def setUp(self):
+        self.tmp_path = "./tests/archive_similarity"
+
+    def tearDown(self):
+        if os.path.exists(self.tmp_path):
+            shutil.rmtree(self.tmp_path)
+
     def test_target_similarity_analysis(self):
         # Arrange
         pkl_filename = "msa_obj"
@@ -77,11 +85,17 @@ class TestTargetSimilarity(TestCase):
         analyzer = MetaheuristicsSimilarityAnalyzer(
             meta_ga=meta_ga,
             target_gene_space=TARGET_GENE_SPACES,
-            base_archive_path="./tests/archive/target_performance_similarity",
+            base_archive_path=self.tmp_path,
         )
 
+        # Act
         analyzer.run_similarity_analysis(
-            num_comparisons=1, get_info=False, generate_dataset=True, export=True, calculate_similarity_metrics=True
+            num_comparisons=1,
+            get_info=False,
+            generate_dataset=True,
+            export=True,
+            calculate_similarity_metrics=True,
+            pkl_filename=pkl_filename,
         )
         analyzer.export_results_to_latex(generate_pdf=True)
         archive_path = analyzer.archive_path
@@ -100,9 +114,9 @@ class TestTargetSimilarity(TestCase):
         )
         self.assertEquals(len(first_dir), num_runs)
         self.assertEquals(len(second_dir), num_runs)
-        self.assertTrue(any(fname.endswith('.pdf') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.tex') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.pkl') for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".tex") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pkl") for fname in os.listdir(archive_path)))
 
     def test_target_similarity_analysis_target_solutions(self):
         # Arrange
@@ -136,7 +150,7 @@ class TestTargetSimilarity(TestCase):
         analyzer = MetaheuristicsSimilarityAnalyzer(
             meta_ga=meta_ga,
             target_gene_space=TARGET_GENE_SPACES,
-            base_archive_path="./tests/archive/target_performance_similarity",
+            base_archive_path=self.tmp_path,
         )
 
         # Act
@@ -165,6 +179,6 @@ class TestTargetSimilarity(TestCase):
         )
         self.assertEquals(len(first_dir), num_runs)
         self.assertEquals(len(second_dir), num_runs)
-        self.assertTrue(any(fname.endswith('.pdf') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.tex') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.pkl') for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".tex") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pkl") for fname in os.listdir(archive_path)))
