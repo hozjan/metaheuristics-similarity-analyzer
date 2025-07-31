@@ -76,7 +76,7 @@ class TestTargetSimilarity(TestCase):
             gene_spaces=GENE_SPACES,
             pop_size=10,
             max_evals=100,
-            num_runs=100,
+            num_runs=num_runs,
             problem=OPTIMIZATION_PROBLEM,
             pop_diversity_metrics=POP_DIVERSITY_METRICS,
             indiv_diversity_metrics=INDIV_DIVERSITY_METRICS,
@@ -102,15 +102,13 @@ class TestTargetSimilarity(TestCase):
         imported_analyzer = analyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
 
         # Assert
-        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_subset")
-        print(dataset_dir)
-        print(imported_analyzer.dataset_path)
+        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_comparison")
         self.assertEquals(len(dataset_dir), 2)
         first_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[0], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[0])
         )
         second_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[1], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[1])
         )
         self.assertEquals(len(first_dir), num_runs)
         self.assertEquals(len(second_dir), num_runs)
@@ -167,15 +165,13 @@ class TestTargetSimilarity(TestCase):
         imported_analyzer = analyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
 
         # Assert
-        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_subset")
-        print(dataset_dir)
-        print(imported_analyzer.dataset_path)
+        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_comparison")
         self.assertEquals(len(dataset_dir), 2)
         first_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[0], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[0])
         )
         second_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[1], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[1])
         )
         self.assertEquals(len(first_dir), num_runs)
         self.assertEquals(len(second_dir), num_runs)
