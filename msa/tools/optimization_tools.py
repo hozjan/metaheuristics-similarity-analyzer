@@ -11,7 +11,7 @@ from pathlib import Path
 
 from msa.tools.optimization_data import PopDiversityMetric, IndivDiversityMetric, SingleRunData, PopulationData
 
-__all__ = ["optimization", "optimization_worker", "optimization_runner"]
+__all__ = ["optimization", "optimization_worker", "optimization_runner", "get_sorted_list_of_runs"]
 
 
 def optimization(
@@ -158,7 +158,7 @@ def optimization_worker(
     if run_index is None:
         raise IndexError("Run index must be provided in order to generate a valid dataset.")
     # check if folder structure exists, if not create it
-    path = os.path.join(dataset_path, algorithm.Name[1], problem.name())
+    path = os.path.join(dataset_path, algorithm.Name[1])
     if os.path.exists(path) is False:
         Path(path).mkdir(parents=True, exist_ok=True)
 
@@ -251,3 +251,23 @@ def optimization_runner(
                 keep_pop_data=keep_pop_data,
                 keep_diversity_metrics=keep_diversity_metrics,
             )
+
+
+def get_sorted_list_of_runs(dataset_path: str, alg_abbr: str):
+    r"""Get a sorted list of paths of exported SingleRunData objects .json files from the provided dataset.
+
+    Args:
+        dataset_path (str): Path of the dataset to extract files from.
+        alg_abbr (str): Abbreviation of the algorithm in the dataset to return the runs paths for.
+
+    Returns:
+        runs_paths (list[str]): a sorted list of paths of exported SingleRunData objects .json files from
+            the provided dataset.
+    """
+    # TODO use where appropriate
+    runs_paths = []
+    runs = os.listdir(os.path.join(dataset_path, alg_abbr))
+    for run in runs:
+        runs_paths.append(os.path.join(dataset_path, alg_abbr, run))
+    runs_paths.sort()
+    return runs_paths

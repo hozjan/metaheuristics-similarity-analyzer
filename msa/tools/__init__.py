@@ -2,7 +2,7 @@
 
 from msa.tools.meta_ga import MetaGA
 from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer, SimilarityMetrics
-from msa.tools.optimization_tools import optimization, optimization_worker, optimization_runner
+from msa.tools.optimization_tools import optimization, optimization_worker, optimization_runner, get_sorted_list_of_runs
 from msa.tools.optimization_data import (
     IndivDiversityMetric,
     PopDiversityMetric,
@@ -18,6 +18,7 @@ __all__ = [
     "optimization",
     "optimization_worker",
     "optimization_runner",
+    "get_sorted_list_of_runs",
     "SingleRunData",
     "PopulationData",
     "JsonEncoder",

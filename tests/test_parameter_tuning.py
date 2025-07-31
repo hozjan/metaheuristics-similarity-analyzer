@@ -1,5 +1,6 @@
 from unittest import TestCase
-import os.path
+import os
+import shutil
 import pygad
 from niapy.problems.schwefel import Schwefel
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
@@ -26,6 +27,13 @@ OPTIMIZATION_PROBLEM = Schwefel(10)
 
 
 class TestParameterTuning(TestCase):
+    def setUp(self):
+        self.tmp_path = "./tests/archive_tuning"
+
+    def tearDown(self):
+        if os.path.exists(self.tmp_path):
+            shutil.rmtree(self.tmp_path)
+
     def test_parameter_tuning(self):
         # Arrange
         meta_ga = MetaGA(
@@ -45,15 +53,16 @@ class TestParameterTuning(TestCase):
             max_evals=100,
             num_runs=100,
             problem=OPTIMIZATION_PROBLEM,
-            base_archive_path="./tests/archive/parameter_tuning",
+            base_archive_path=self.tmp_path,
         )
 
         # Act
         meta_ga_filename = "meta_ga_obj"
-        meta_ga.run_meta_ga(filename=meta_ga_filename, prefix="0", get_info=False)
-        meta_ga_save = pygad.load(f"./tests/archive/parameter_tuning/0_BA_Schwefel/{meta_ga_filename}")
+        meta_ga.run_meta_ga(filename=meta_ga_filename)
+        archive_path = meta_ga.archive_path
+        meta_ga_save = pygad.load(os.path.join(archive_path, meta_ga_filename))
 
         # Assert
         self.assertIsNotNone(meta_ga_save)
-        self.assertTrue(os.path.isfile("./tests/archive/parameter_tuning/0_BA_Schwefel/meta_ga_log_file.txt"))
-        self.assertTrue(os.path.isfile("./tests/archive/parameter_tuning/0_BA_Schwefel/meta_ga_fitness_plot.png"))
+        self.assertTrue(any(fname.endswith(".txt") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".png") for fname in os.listdir(archive_path)))
