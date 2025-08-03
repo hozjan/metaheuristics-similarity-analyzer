@@ -264,7 +264,6 @@ def get_sorted_list_of_runs(dataset_path: str, alg_abbr: str):
         runs_paths (list[str]): a sorted list of paths of exported SingleRunData objects .json files from
             the provided dataset.
     """
-    # TODO use where appropriate
     runs_paths = []
     runs = os.listdir(os.path.join(dataset_path, alg_abbr))
     for run in runs:

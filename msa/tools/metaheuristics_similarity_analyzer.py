@@ -442,12 +442,12 @@ class MetaheuristicsSimilarityAnalyzer:
 
             first_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.target_alg_abbr)
             second_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.optimized_alg_abbr)
-            for idx, runs in enumerate([first_runs, second_runs]):
+            for alg_label, runs in enumerate([first_runs, second_runs]):
                 for run_path in runs:
                     srd = SingleRunData.import_from_json(run_path)
                     feature_vector = srd.get_feature_vector(standard_scale=True)
                     feature_vectors.append(feature_vector)
-                    actual_labels.append(idx)
+                    actual_labels.append(alg_label)
 
             for _ in range(repetitions):
                 # train test split
