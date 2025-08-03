@@ -1,6 +1,7 @@
 from unittest import TestCase
 import numpy as np
-import os.path
+import shutil
+import os
 from msa.diversity_metrics.population_diversity.dpc import DPC
 from msa.diversity_metrics.population_diversity.fdc import FDC
 from msa.diversity_metrics.population_diversity.pfsd import PFSD
@@ -48,6 +49,13 @@ INDIV_DIVERSITY_METRICS = [
 
 
 class TestTargetSimilarity(TestCase):
+    def setUp(self):
+        self.tmp_path = "./tests/archive_similarity"
+
+    def tearDown(self):
+        if os.path.exists(self.tmp_path):
+            shutil.rmtree(self.tmp_path)
+
     def test_target_similarity_analysis(self):
         # Arrange
         pkl_filename = "msa_obj"
@@ -68,7 +76,7 @@ class TestTargetSimilarity(TestCase):
             gene_spaces=GENE_SPACES,
             pop_size=10,
             max_evals=100,
-            num_runs=100,
+            num_runs=num_runs,
             problem=OPTIMIZATION_PROBLEM,
             pop_diversity_metrics=POP_DIVERSITY_METRICS,
             indiv_diversity_metrics=INDIV_DIVERSITY_METRICS,
@@ -77,32 +85,36 @@ class TestTargetSimilarity(TestCase):
         analyzer = MetaheuristicsSimilarityAnalyzer(
             meta_ga=meta_ga,
             target_gene_space=TARGET_GENE_SPACES,
-            base_archive_path="./tests/archive/target_performance_similarity",
+            base_archive_path=self.tmp_path,
         )
 
+        # Act
         analyzer.run_similarity_analysis(
-            num_comparisons=1, get_info=False, generate_dataset=True, export=True, calculate_similarity_metrics=True
+            num_comparisons=1,
+            get_info=False,
+            generate_dataset=True,
+            export=True,
+            calculate_similarity_metrics=True,
+            pkl_filename=pkl_filename,
         )
         analyzer.export_results_to_latex(generate_pdf=True)
         archive_path = analyzer.archive_path
         imported_analyzer = analyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
 
         # Assert
-        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_subset")
-        print(dataset_dir)
-        print(imported_analyzer.dataset_path)
+        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_comparison")
         self.assertEquals(len(dataset_dir), 2)
         first_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[0], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[0])
         )
         second_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[1], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[1])
         )
         self.assertEquals(len(first_dir), num_runs)
         self.assertEquals(len(second_dir), num_runs)
-        self.assertTrue(any(fname.endswith('.pdf') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.tex') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.pkl') for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".tex") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pkl") for fname in os.listdir(archive_path)))
 
     def test_target_similarity_analysis_target_solutions(self):
         # Arrange
@@ -136,7 +148,7 @@ class TestTargetSimilarity(TestCase):
         analyzer = MetaheuristicsSimilarityAnalyzer(
             meta_ga=meta_ga,
             target_gene_space=TARGET_GENE_SPACES,
-            base_archive_path="./tests/archive/target_performance_similarity",
+            base_archive_path=self.tmp_path,
         )
 
         # Act
@@ -153,18 +165,16 @@ class TestTargetSimilarity(TestCase):
         imported_analyzer = analyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
 
         # Assert
-        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_subset")
-        print(dataset_dir)
-        print(imported_analyzer.dataset_path)
+        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_comparison")
         self.assertEquals(len(dataset_dir), 2)
         first_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[0], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[0])
         )
         second_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_subset", dataset_dir[1], OPTIMIZATION_PROBLEM.name())
+            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[1])
         )
         self.assertEquals(len(first_dir), num_runs)
         self.assertEquals(len(second_dir), num_runs)
-        self.assertTrue(any(fname.endswith('.pdf') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.tex') for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith('.pkl') for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".tex") for fname in os.listdir(archive_path)))
+        self.assertTrue(any(fname.endswith(".pkl") for fname in os.listdir(archive_path)))

@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 import numpy as np
 import pygad
-from msa.tools.optimization_tools import optimization_runner
+from msa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
 from msa.tools.optimization_data import SingleRunData, IndivDiversityMetric, PopDiversityMetric
 from msa.util.helper import get_algorithm_by_name
 import shutil
@@ -25,6 +25,8 @@ __all__ = ["MetaGA"]
 
 class MetaGA:
     r"""Class containing metadata of meta genetic algorithm."""
+
+    # TODO add attributes
 
     def __init__(
         self,
@@ -125,11 +127,11 @@ class MetaGA:
         self.high_ranges: list[float] = []
         self.random_mutation_min_val: list[float] = []
         self.random_mutation_max_val: list[float] = []
+        self.archive_path = ""
         self.__fitness_function = None
-        self.__algorithms: list[str] = []
-        self.__target_algorithm: Algorithm | None = None
+        self.__optimized_algorithm = Algorithm()
+        self.__target_algorithm = Algorithm()
         self.__meta_dataset = "meta_dataset"
-        self.__archive_path = ""
         self.__meta_ga_tmp_data_path = ""
         self.__init_parameters()
 
@@ -146,9 +148,10 @@ class MetaGA:
         """
         # check if all values in the provided gene spaces are correct and
         # assemble combined gene space for meta GA
+        algorithms = []
         for alg_name in self.gene_spaces:
             algorithm = get_algorithm_by_name(alg_name)
-            self.__algorithms.append(algorithm.Name[1])
+            algorithms.append(algorithm)
             for setting in self.gene_spaces[alg_name]:
                 if not hasattr(algorithm, setting):
                     raise ValueError(f"Algorithm `{alg_name}` has no attribute named `{setting}`.")
@@ -161,46 +164,52 @@ class MetaGA:
                 self.random_mutation_min_val.append(-self.random_mutation_max_val[-1])
 
         if self.fitness_function_type == MetaGAFitnessFunction.PARAMETER_TUNING:
-            if len(self.__algorithms) != 1:
+            if len(algorithms) != 1:
                 raise ValueError(
                     """Only one algorithm must be defined in the `gene_spaces` provided
                     when fitness_function_type set to `PARAMETER_TUNING`."""
                 )
             self.__fitness_function = self.meta_ga_fitness_function_for_parameter_tuning
         elif self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
-            if len(self.__algorithms) != 1:
+            if len(algorithms) != 1:
                 raise ValueError(
                     """Only one algorithm must be defined in `gene_spaces` provided when
                     fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."""
                 )
             self.__fitness_function = self.meta_ga_fitness_function_for_target_performance_similarity
 
+        self.__optimized_algorithm = algorithms[0]
+
         # check if the provided optimization problem is correct
         if not isinstance(self.problem, Problem):
             raise TypeError(f"Provided problem type `{type(self.problem).__name__}` is not compatible.")
 
-    def __create_folder_structure(self, prefix: str | None = None):
+    def __create_folder_structure(self, prefix: str | None = None, suffix: str | None = None):
         r"""Create folder structure for the meta genetic algorithm.
 
         Args:
             prefix (Optional[str]): Use custom prefix for the name of the base
                 folder in structure. Uses current datetime by default.
+            suffix (Optional[str]): Use custom suffix for the name of the base folder in structure. Uses the
+                abbreviation of the selected algorithm and name of the optimization problem by default.
         """
         if prefix is None:
             prefix = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
-        self.__archive_path = os.path.join(
+        if suffix is None:
+            suffix = "_".join([self.__optimized_algorithm.Name[1], self.problem.name()])
+        self.archive_path = os.path.join(
             self.base_archive_path,
-            "_".join([prefix, *self.__algorithms, self.problem.name()]),
+            "_".join([prefix, suffix]),
         )
-        self.__meta_ga_tmp_data_path = os.path.join(self.__archive_path, "meta_ga_tmp_data")
-        if os.path.exists(self.__archive_path) is False:
-            Path(self.__archive_path).mkdir(parents=True, exist_ok=True)
+        self.__meta_ga_tmp_data_path = os.path.join(self.archive_path, "meta_ga_tmp_data")
+        if os.path.exists(self.archive_path) is False:
+            Path(self.archive_path).mkdir(parents=True, exist_ok=True)
 
-    def __get_logger(self, filename: str = "meta_ga_log_file"):
+    def __get_logger(self, filename):
         r"""Get logger for meta genetic algorithm. Outputs to file and console.
 
         Args:
-            filename (Optional[str]): Log file name.
+            filename (str): Log file name.
 
         Returns:
             logger (Logger)
@@ -231,21 +240,24 @@ class MetaGA:
         gene_spaces: dict[str | Algorithm, dict[str, dict[str, float]]],
         pop_size: int,
     ):
-        r"""Apply meta genetic algorithm solution to an corresponding algorithms based on
+        r"""Apply meta genetic algorithm solution to an corresponding algorithm based on
         the gene spaces used for the meta optimization. Make sure the solution matches the gene space.
 
         Args:
             solution (list[float | numpy.ndarray]): Meta genetic algorithm solution.
             gene_spaces (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene spaces of the solution.
-            pop_size (int): Population size of the algorithms returned.
+            pop_size (int): Population size of the algorithm returned.
 
         Returns:
-            list: Array of Algorithms configured based on solution and gene_space.
+            algorithm (Algorithm): Algorithm configured based on solution and gene_space.
 
         Raises:
+            ValueError: Argument `gene_spaces` must only contain one algorithm.
             ValueError: The length of the provided solution does not match the number of attributes in `gene_spaces`.
             ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
         """
+        if len(gene_spaces) != 1:
+            raise ValueError("Argument `gene_spaces` must contain only one algorithm.")
         settings_counter = 0
         for alg_name in gene_spaces:
             settings_counter += len(gene_spaces[alg_name])
@@ -262,7 +274,7 @@ class MetaGA:
                 algorithm.__setattr__(setting, solution[solution_iter])
                 solution_iter += 1
             algorithms.append(algorithm)
-        return algorithms
+        return algorithms[0]
 
     @staticmethod
     def on_generation_progress(ga: pygad.GA):
@@ -286,30 +298,26 @@ class MetaGA:
 
         meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
 
-        algorithms = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
+        configured_algorithm = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
 
         # gather optimization data
-        for algorithm in algorithms:
-            optimization_runner(
-                algorithm=algorithm,
-                problem=self.problem,
-                runs=self.num_runs,
-                dataset_path=meta_dataset,
-                max_iters=self.max_iters,
-                max_evals=self.max_evals,
-                run_index_seed=True,
-                keep_pop_data=False,
-                keep_diversity_metrics=False,
-                parallel_processing=True,
-            )
+        optimization_runner(
+            algorithm=configured_algorithm,
+            problem=self.problem,
+            runs=self.num_runs,
+            dataset_path=meta_dataset,
+            max_iters=self.max_iters,
+            max_evals=self.max_evals,
+            run_index_seed=True,
+            keep_pop_data=False,
+            keep_diversity_metrics=False,
+            parallel_processing=True,
+        )
 
         fitness_values = []
-        for algorithm in os.listdir(meta_dataset):
-            for problem in os.listdir(os.path.join(meta_dataset, algorithm)):
-                runs = os.listdir(os.path.join(meta_dataset, algorithm, problem))
-                for run in runs:
-                    run_path = os.path.join(meta_dataset, algorithm, problem, run)
-                    fitness_values.append(SingleRunData.import_from_json(run_path).best_fitness)
+        runs = get_sorted_list_of_runs(meta_dataset, configured_algorithm.Name[1])
+        for run_path in runs:
+            fitness_values.append(SingleRunData.import_from_json(run_path).best_fitness)
 
         avg_fitness = np.average(fitness_values)
 
@@ -322,45 +330,30 @@ class MetaGA:
 
         meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
 
-        algorithms = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
+        configured_algorithm = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
 
         # gather optimization data
-        for algorithm in algorithms:
-            optimization_runner(
-                algorithm=algorithm,
-                problem=self.problem,
-                runs=self.num_runs,
-                dataset_path=meta_dataset,
-                pop_diversity_metrics=self.pop_diversity_metrics,
-                indiv_diversity_metrics=self.indiv_diversity_metrics,
-                max_iters=self.max_iters,
-                max_evals=self.max_evals,
-                run_index_seed=True,
-                keep_pop_data=False,
-                parallel_processing=True,
-            )
-
-        target_runs_path = os.path.join(
-            self.__meta_ga_tmp_data_path,
-            self.__target_algorithm.Name[1],
-            self.problem.name(),
+        optimization_runner(
+            algorithm=configured_algorithm,
+            problem=self.problem,
+            runs=self.num_runs,
+            dataset_path=meta_dataset,
+            pop_diversity_metrics=self.pop_diversity_metrics,
+            indiv_diversity_metrics=self.indiv_diversity_metrics,
+            max_iters=self.max_iters,
+            max_evals=self.max_evals,
+            run_index_seed=True,
+            keep_pop_data=False,
+            parallel_processing=True,
         )
 
-        target_runs = os.listdir(target_runs_path)
-        target_runs.sort()
-
-        optimized_runs = []
-        optimized_runs_path = ""
-        for algorithm in os.listdir(meta_dataset):
-            for problem in os.listdir(os.path.join(meta_dataset, algorithm)):
-                optimized_runs_path = os.path.join(meta_dataset, algorithm, problem)
-                optimized_runs = os.listdir(optimized_runs_path)
-                optimized_runs.sort()
+        target_runs = get_sorted_list_of_runs(self.__meta_ga_tmp_data_path, self.__target_algorithm.Name[1])
+        optimized_runs = get_sorted_list_of_runs(meta_dataset, self.__optimized_algorithm.Name[1])
 
         similarities = []
         for target, optimized in zip(target_runs, optimized_runs):
-            target_srd = SingleRunData.import_from_json(os.path.join(target_runs_path, target))
-            optimized_srd = SingleRunData.import_from_json(os.path.join(optimized_runs_path, optimized))
+            target_srd = SingleRunData.import_from_json(target)
+            optimized_srd = SingleRunData.import_from_json(optimized)
             similarities.append(target_srd.get_diversity_metrics_similarity(optimized_srd))
 
         return np.mean(similarities)
@@ -389,9 +382,11 @@ class MetaGA:
         self,
         filename="meta_ga_obj",
         plot_filename="meta_ga_fitness_plot",
+        log_filename="meta_ga_log_file",
         target_algorithm: Algorithm | None = None,
         get_info: bool = False,
         prefix: str | None = None,
+        suffix: str | None = None,
         return_best_solution: bool = False,
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
@@ -399,11 +394,14 @@ class MetaGA:
         Args:
             filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
             plot_filename (Optional[str]): Name of the fitness plot image file.
+            log_filename (Optional[str]): Name of the generated log file.
             target_algorithm (Optional[Algorithm]): Target algorithm for the performance similarity evaluation.
                 Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
             prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current
                 datetime by default.
+            suffix (Optional[str]): Use custom suffix for the name of the base folder in structure. Uses the
+                abbreviation of the selected algorithm and name of the optimization problem by default.
             return_best_solution (Optional[bool]): returns best solution if True.
 
         Returns:
@@ -423,12 +421,12 @@ class MetaGA:
         else:
             self.__target_algorithm = target_algorithm
 
-        self.__create_folder_structure(prefix=prefix)
+        self.__create_folder_structure(prefix=prefix, suffix=suffix)
         self.__before_meta_optimization()
 
         if get_info:
             self.meta_ga_info(
-                filename=os.path.join(self.__archive_path, "meta_ga_info"),
+                filename=os.path.join(self.archive_path, "meta_ga_info"),
             )
 
         num_parents_mating = int(self.ga_solutions_per_pop * (self.ga_percent_parents_mating / 100))
@@ -455,15 +453,15 @@ class MetaGA:
             on_generation=self.on_generation_progress,
             save_best_solutions=True,
             save_solutions=True,
-            logger=self.__get_logger(filename=os.path.join(self.__archive_path, "meta_ga_log_file")),
+            logger=self.__get_logger(filename=os.path.join(self.archive_path, log_filename)),
         )
 
         self.meta_ga.run()
         self.__clean_tmp_data()
 
         self.meta_ga.logger.handlers.clear()
-        self.meta_ga.save(os.path.join(self.__archive_path, filename))
-        self.meta_ga.plot_fitness(save_dir=os.path.join(self.__archive_path, f"{plot_filename}.png"))
+        self.meta_ga.save(os.path.join(self.archive_path, filename))
+        self.meta_ga.plot_fitness(save_dir=os.path.join(self.archive_path, f"{plot_filename}.png"))
         best_solutions = self.meta_ga.best_solutions
         print(f"Best solution: {best_solutions[-1]}")
 

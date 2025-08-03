@@ -16,7 +16,7 @@ from pylatex import MultiColumn, Package, LongTable
 from pylatex.utils import bold, NoEscape
 from msa.util.helper import random_float_with_step, get_algorithm_by_name
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
-from msa.tools.optimization_tools import optimization_runner
+from msa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
 from msa.tools.optimization_data import SingleRunData
 import numpy as np
 import numpy.typing as npt
@@ -43,6 +43,8 @@ class MetaheuristicsSimilarityAnalyzer:
     selected parameters and aims to find parameters of the optimized
     metaheuristic with which they perform in a similar maner.
     """
+
+    # TODO add attributes
 
     def __init__(
         self,
@@ -88,8 +90,10 @@ class MetaheuristicsSimilarityAnalyzer:
         self.optimized_alg_abbr = get_algorithm_by_name(list(self.meta_ga.gene_spaces)[0]).Name[1]
         self._base_archive_path = base_archive_path
 
-    def __generate_targets(self, num_comparisons: int, generate_optimized_targets: bool = False):
-        r"""Generate target solutions.
+    def __generate_targets_and_folder_structure(
+        self, num_comparisons: int, generate_optimized_targets: bool = False, prefix: str | None = None
+    ):
+        r"""Generate target solutions and folder structure.
 
         Args:
             generate_optimized_targets (Optional[bool]): Generate target
@@ -97,6 +101,8 @@ class MetaheuristicsSimilarityAnalyzer:
                 random targets.
             num_comparisons (Optional[int]): Number of metaheuristic parameter
                 combinations to analyze during the similarity analysis.
+            prefix (Optional[str]): Use custom prefix for the name of the base
+                folder in structure. Uses current datetime by default.
 
         Raises:
             ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
@@ -114,7 +120,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 high_ranges.append(self.target_gene_space[alg_name][setting]["high"])
                 steps.append(self.target_gene_space[alg_name][setting]["step"])
 
-        self.__create_folder_structure()
+        self.__create_folder_structure(prefix=prefix)
 
         for idx in range(num_comparisons):
             if generate_optimized_targets:
@@ -160,50 +166,24 @@ class MetaheuristicsSimilarityAnalyzer:
                 "Dataset does not exist. Run `generate_dataset_from_solutions` to generate dataset!"
             )
 
-        subsets = os.listdir(self.dataset_path)
+        comparisons = os.listdir(self.dataset_path)
 
         mean_smape = []
         cosine_similarity = []
         spearman_r = []
 
-        problem = self.meta_ga.problem.name()
-
-        for idx in range(len(subsets)):
-            subset = f"{idx}_subset"
+        for idx in range(len(comparisons)):
+            comparison = f"{idx}_comparison"
             feature_vectors_1 = []
             feature_vectors_2 = []
 
-            first_runs = os.listdir(os.path.join(self.dataset_path, subset, self.target_alg_abbr, problem))
-            second_runs = os.listdir(
-                os.path.join(
-                    self.dataset_path,
-                    subset,
-                    self.optimized_alg_abbr,
-                    problem,
-                )
-            )
-
-            first_runs.sort()
-            second_runs.sort()
+            first_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.target_alg_abbr)
+            second_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.optimized_alg_abbr)
 
             smape_values = []
-            for fr, sr in zip(first_runs, second_runs):
-                first_run_path = os.path.join(
-                    self.dataset_path,
-                    subset,
-                    self.target_alg_abbr,
-                    problem,
-                    fr,
-                )
-                second_run_path = os.path.join(
-                    self.dataset_path,
-                    subset,
-                    self.optimized_alg_abbr,
-                    problem,
-                    sr,
-                )
-                f_srd = SingleRunData.import_from_json(first_run_path)
-                s_srd = SingleRunData.import_from_json(second_run_path)
+            for first_run, second_run in zip(first_runs, second_runs):
+                f_srd = SingleRunData.import_from_json(first_run)
+                s_srd = SingleRunData.import_from_json(second_run)
 
                 f_feature_vector = f_srd.get_feature_vector()
                 s_feature_vector = s_srd.get_feature_vector()
@@ -243,24 +223,29 @@ class MetaheuristicsSimilarityAnalyzer:
         if num_runs is None:
             num_runs = self.meta_ga.num_runs
 
-        for idx, (solution_0, solution_1) in enumerate(zip(self.target_solutions, self.optimized_solutions)):
-            _subset_path = os.path.join(self.dataset_path, f"{idx}_subset")
-            if os.path.exists(_subset_path) is False:
-                Path(_subset_path).mkdir(parents=True, exist_ok=True)
+        for idx, (target_solution, optimized_solution) in enumerate(
+            zip(self.target_solutions, self.optimized_solutions)
+        ):
+            _comparison_path = os.path.join(self.dataset_path, f"{idx}_comparison")
+            if os.path.exists(_comparison_path) is False:
+                Path(_comparison_path).mkdir(parents=True, exist_ok=True)
 
-            solution = np.append(solution_0, solution_1)
-            gene_spaces = self.target_gene_space | self.meta_ga.gene_spaces
-            algorithms = MetaGA.solution_to_algorithm_attributes(
-                solution=solution,
-                gene_spaces=gene_spaces,
+            target_algorithm = MetaGA.solution_to_algorithm_attributes(
+                solution=target_solution,
+                gene_spaces=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
-            for algorithm in algorithms:
+            optimized_algorithm = MetaGA.solution_to_algorithm_attributes(
+                solution=optimized_solution,
+                gene_spaces=self.meta_ga.gene_spaces,
+                pop_size=self.meta_ga.pop_size,
+            )
+            for algorithm in (target_algorithm, optimized_algorithm):
                 optimization_runner(
                     algorithm=algorithm,
                     problem=self.meta_ga.problem,
                     runs=num_runs,
-                    dataset_path=_subset_path,
+                    dataset_path=_comparison_path,
                     pop_diversity_metrics=self.meta_ga.pop_diversity_metrics,
                     indiv_diversity_metrics=self.meta_ga.indiv_diversity_metrics,
                     max_evals=self.meta_ga.max_evals,
@@ -269,15 +254,21 @@ class MetaheuristicsSimilarityAnalyzer:
                     parallel_processing=True,
                 )
 
-    def __create_folder_structure(self):
-        r"""Create folder structure for metaheuristic similarity analysis."""
-        datetime_now = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
+    def __create_folder_structure(self, prefix: str | None = None):
+        r"""Create folder structure for metaheuristic similarity analysis.
+
+        Args:
+            prefix (Optional[str]): Use custom prefix for the name of the base
+                folder in structure. Uses current datetime by default.
+        """
+        if prefix is None:
+            prefix = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
         self.archive_path = os.path.join(
             self._base_archive_path,
             "_".join(
                 [
-                    datetime_now,
-                    self.target_alg_abbr,
+                    prefix,
+                    f"{self.target_alg_abbr}-{self.optimized_alg_abbr}",
                     self.meta_ga.problem.name(),
                 ]
             ),
@@ -294,6 +285,7 @@ class MetaheuristicsSimilarityAnalyzer:
         get_info: bool = False,
         generate_dataset: bool = False,
         calculate_similarity_metrics: bool = False,
+        prefix: str | None = None,
         export: bool = False,
         pkl_filename: str = "msa_obj",
     ):
@@ -318,6 +310,8 @@ class MetaheuristicsSimilarityAnalyzer:
                 similarity metrics from target and optimized solutions
                 after analysis (false by default). Has no effect if
                 `generate_dataset` is false.
+            prefix (Optional[str]): Use custom prefix for the name of the base
+                folder in structure. Uses current datetime by default.
             export (Optional[bool]): Export MSA object to pkl after analysis.
             pkl_filename (Optional[str]): Filename of the exported .pkl file.
                 Used if `export` is true.
@@ -339,10 +333,10 @@ class MetaheuristicsSimilarityAnalyzer:
             raise ValueError("""None of the `num_comparisons` or `target_solutions` was defined!""")
 
         if target_solutions is None and num_comparisons is not None:
-            self.__generate_targets(num_comparisons, generate_optimized_targets)
+            self.__generate_targets_and_folder_structure(num_comparisons, generate_optimized_targets, prefix)
         elif target_solutions is not None:
             self.target_solutions = target_solutions
-            self.__create_folder_structure()
+            self.__create_folder_structure(prefix=prefix)
 
         self.meta_ga.base_archive_path = self.archive_path
 
@@ -357,7 +351,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 gene_spaces=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
-            self.meta_ga.run_meta_ga(target_algorithm=target_algorithm[0], prefix=str(idx))
+            self.meta_ga.run_meta_ga(target_algorithm=target_algorithm, prefix=str(idx), suffix="comparison")
             if self.meta_ga.meta_ga is not None:
                 self.optimized_solutions.append(self.meta_ga.meta_ga.best_solutions[-1])
 
@@ -433,33 +427,27 @@ class MetaheuristicsSimilarityAnalyzer:
             1-accuracy scores (dict[str, numpy.ndarray[float]]): Dictionary containing 1-accuracy scores for test and
                 also train (if `get_train_accuracy` is True) subsets of both models.
         """
-        alg_1_label = ""
-        alg_2_label = ""
+        alg_1_label = self.target_alg_abbr
+        alg_2_label = self.optimized_alg_abbr
         _k_svm_scores = []
         _knn_scores = []
-        subsets = os.listdir(self.dataset_path)
+        comparisons = os.listdir(self.dataset_path)
 
-        for idx in range(len(subsets)):
-            subset = f"{idx}_subset"
-            subset_k_svm_scores = []
-            subset_knn_scores = []
+        for idx in range(len(comparisons)):
+            comparison = f"{idx}_comparison"
+            comparison_k_svm_scores = []
+            comparison_knn_scores = []
             feature_vectors = []
             actual_labels = []
-            for idx, algorithm in enumerate(os.listdir(os.path.join(self.dataset_path, subset))):
-                if idx == 0 and alg_1_label == "":
-                    alg_1_label = algorithm
-                elif idx == 1 and alg_2_label == "":
-                    alg_2_label = algorithm
 
-                for problem in os.listdir(os.path.join(self.dataset_path, subset, algorithm)):
-                    runs = os.listdir(os.path.join(self.dataset_path, subset, algorithm, problem))
-                    runs.sort()
-                    for run in runs:
-                        run_path = os.path.join(self.dataset_path, subset, algorithm, problem, run)
-                        srd = SingleRunData.import_from_json(run_path)
-                        feature_vector = srd.get_feature_vector(standard_scale=True)
-                        feature_vectors.append(feature_vector)
-                        actual_labels.append(idx)
+            first_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.target_alg_abbr)
+            second_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.optimized_alg_abbr)
+            for alg_label, runs in enumerate([first_runs, second_runs]):
+                for run_path in runs:
+                    srd = SingleRunData.import_from_json(run_path)
+                    feature_vector = srd.get_feature_vector(standard_scale=True)
+                    feature_vectors.append(feature_vector)
+                    actual_labels.append(alg_label)
 
             for _ in range(repetitions):
                 # train test split
@@ -498,7 +486,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 tmp = []
                 tmp.append(1.0 - svm_training_score)
                 tmp.append(1.0 - svm_test_score)
-                subset_k_svm_scores.append(tmp)
+                comparison_k_svm_scores.append(tmp)
 
                 # kNN classifier
                 # define the parameter grid
@@ -521,10 +509,10 @@ class MetaheuristicsSimilarityAnalyzer:
                 tmp = []
                 tmp.append(1.0 - knn_training_score)
                 tmp.append(1.0 - knn_test_score)
-                subset_knn_scores.append(tmp)
+                comparison_knn_scores.append(tmp)
 
-            _k_svm_scores.append(np.mean(subset_k_svm_scores, axis=0))
-            _knn_scores.append(np.mean(subset_knn_scores, axis=0))
+            _k_svm_scores.append(np.mean(comparison_k_svm_scores, axis=0))
+            _knn_scores.append(np.mean(comparison_knn_scores, axis=0))
 
         k_svm_scores = np.array(_k_svm_scores)
         knn_scores = np.array(_knn_scores)
@@ -656,9 +644,7 @@ class MetaheuristicsSimilarityAnalyzer:
             hyperparameters_table = self.get_hyperparameters_and_similarity_metrics_latex_table()
             doc.append(hyperparameters_table)
         else:
-            doc.append(
-                "Not able to display the table because similarity metrics were not calculated."
-            )
+            doc.append("Not able to display the table because similarity metrics were not calculated.")
 
         doc.append(Subsection("Comparison of fitness statistics"))
 
@@ -670,7 +656,7 @@ class MetaheuristicsSimilarityAnalyzer:
             doc.generate_pdf(
                 os.path.join(
                     self.archive_path,
-                    f"{self.target_alg_abbr}_{self.optimized_alg_abbr}_MSA_results",
+                    f"{self.target_alg_abbr}-{self.optimized_alg_abbr}_MSA_results",
                 ),
                 clean_tex=False,
             )
@@ -678,7 +664,7 @@ class MetaheuristicsSimilarityAnalyzer:
             doc.generate_tex(
                 os.path.join(
                     self.archive_path,
-                    f"{self.target_alg_abbr}_{self.optimized_alg_abbr}_MSA_results",
+                    f"{self.target_alg_abbr}-{self.optimized_alg_abbr}_MSA_results",
                 )
             )
 
@@ -813,7 +799,7 @@ class MetaheuristicsSimilarityAnalyzer:
         fitness_table.add_row(("c.n.", "min.", "mean.", "std.", "min.", "mean.", "std."))
         fitness_table.add_hline()
 
-        subsets = os.listdir(self.dataset_path)
+        comparisons = os.listdir(self.dataset_path)
 
         # Collect fitness data from metaheuristic optimization runs
         fitness_statistics = []
@@ -822,29 +808,11 @@ class MetaheuristicsSimilarityAnalyzer:
             mean_fitness = []
             min_fitness = []
             std_fitness = []
-            for idx in range(len(subsets)):
-                subset = f"{idx}_subset"
-                runs = os.listdir(
-                    os.path.join(
-                        self.dataset_path,
-                        subset,
-                        alg_abbr,
-                        self.meta_ga.problem.name(),
-                    )
-                )
-
-                runs.sort()
+            for idx in range(len(comparisons)):
+                comparison = f"{idx}_comparison"
+                runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), alg_abbr)
                 fitness = []
-
-                for run in runs:
-                    run_path = os.path.join(
-                        self.dataset_path,
-                        subset,
-                        alg_abbr,
-                        self.meta_ga.problem.name(),
-                        run,
-                    )
-
+                for run_path in runs:
                     srd = SingleRunData.import_from_json(run_path)
                     fitness.append(srd.best_fitness)
 
