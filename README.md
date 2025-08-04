@@ -22,7 +22,7 @@ BA_gene_spaces = {
     }
 }
 ```
-We also have to chose diversity metrics which will be used as the basis of the analysis.
+We also have to chose diversity metrics which will be used as the basis of the analysis and the optimization problem the metaheuristics are going to solve.
 
 ```python
 from msa.diversity_metrics.population_diversity.dpc import DPC
@@ -55,7 +55,6 @@ In the next step we have to instantiate the `MetaGA` class which uses the `GA` c
 
 ```python
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
-from msa.problems.schwefel import Schwefel
 
 meta_ga = MetaGA(
     fitness_function_type=MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY,
@@ -73,7 +72,7 @@ meta_ga = MetaGA(
     pop_size=30,
     max_evals=10000,
     num_runs=30,
-    problem=Schwefel(20),
+    problem=OPTIMIZATION_PROBLEM,
     pop_diversity_metrics=POP_DIVERSITY_METRICS,
     indiv_diversity_metrics=INDIV_DIVERSITY_METRICS,
 )
@@ -82,17 +81,20 @@ meta_ga = MetaGA(
 In the last step we have to instantiate the `MetaheuristicSimilarityAnalyzer` class and pass it the configured `MetaGA` instance and the gene space of the target algorithm. Then we simply call the `run_similarity_analysis` method to start the analysis.
 
 ```python
-msa = MetaheuristicSimilarityAnalyzer(meta_ga=meta_ga, target_gene_space=PSA_gene_spaces)
+from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
+
+msa = MetaheuristicsSimilarityAnalyzer(meta_ga=meta_ga, target_gene_space=PSA_gene_spaces)
 
 msa.run_similarity_analysis(
+    num_comparisons=10
     get_info=True,
     generate_dataset=True,
-    export=True,
     calculate_similarity_metrics=True,
+    export=True,
 )
 ```
 
-After the analysis we can choose to export results of the analysis as a .pdf and/or .tex file with `export_results_to_latex` method ar access them trough the `MetaheuristicSimilarityAnalyzer` class instance.
+After the analysis we can choose to export results of the analysis as a .pdf and/or .tex file with `export_results_to_latex` method or access them trough the `MetaheuristicsSimilarityAnalyzer` class instance.
 
 ```python
 msa.export_results_to_latex(generate_pdf=True)

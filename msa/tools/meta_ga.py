@@ -6,13 +6,18 @@ from pathlib import Path
 import numpy as np
 import pygad
 from msa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
-from msa.tools.optimization_data import SingleRunData, IndivDiversityMetric, PopDiversityMetric
+from msa.tools.optimization_data import (
+    SingleRunData,
+    IndivDiversityMetric,
+    PopDiversityMetric,
+)
 from msa.util.helper import get_algorithm_by_name
 import shutil
 import logging
 import graphviz
 from enum import Enum
 import os
+import pylatex
 
 
 class MetaGAFitnessFunction(Enum):
@@ -87,10 +92,12 @@ class MetaGA:
 
             ValueError: No diversity metrics defined when required.
             ValueError: Neither of `max_evals` or `max_iters` was assigned a finite value.
+            ValueError: Incorrect number of algorithms defined in the provided `gene_spaces`.
+            TypeError: Provided `problem` is of incorrect type.
         """
 
         if fitness_function_type is MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY and (
-            pop_diversity_metrics is None and indiv_diversity_metrics is None
+            pop_diversity_metrics is None or indiv_diversity_metrics is None
         ):
             raise ValueError(
                 "Diversity metrics must be defined when fitness_function_type set to `PERFORMANCE_SIMILARITY`."
@@ -98,6 +105,12 @@ class MetaGA:
 
         if max_evals == np.inf and max_iters == np.inf:
             raise ValueError("Defining a finite value for max_evals and/or max_iters is required.")
+
+        if len(gene_spaces) != 1:
+            raise ValueError("Only one algorithm must be defined in the `gene_spaces` provided.")
+
+        if not isinstance(problem, Problem):
+            raise TypeError(f"Provided problem type `{type(problem).__name__}` is not compatible.")
 
         self.fitness_function_type = fitness_function_type
         self.gene_spaces = gene_spaces
@@ -141,13 +154,9 @@ class MetaGA:
 
         Raises:
             ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
-            ValueError: Incorrect number of algorithms provided in the `gene_spaces`.
-            ValueError: Incorrect number of algorithms provided in the `gene_spaces`.
-            ValueError: Incorrect number of algorithms provided in the `gene_spaces`.
-            TypeError: Provided `problem` is of incorrect type.
         """
         # check if all values in the provided gene spaces are correct and
-        # assemble combined gene space for meta GA
+        # assemble combined gene space for met-GA
         algorithms = []
         for alg_name in self.gene_spaces:
             algorithm = get_algorithm_by_name(alg_name)
@@ -164,25 +173,11 @@ class MetaGA:
                 self.random_mutation_min_val.append(-self.random_mutation_max_val[-1])
 
         if self.fitness_function_type == MetaGAFitnessFunction.PARAMETER_TUNING:
-            if len(algorithms) != 1:
-                raise ValueError(
-                    """Only one algorithm must be defined in the `gene_spaces` provided
-                    when fitness_function_type set to `PARAMETER_TUNING`."""
-                )
             self.__fitness_function = self.meta_ga_fitness_function_for_parameter_tuning
         elif self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
-            if len(algorithms) != 1:
-                raise ValueError(
-                    """Only one algorithm must be defined in `gene_spaces` provided when
-                    fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."""
-                )
             self.__fitness_function = self.meta_ga_fitness_function_for_target_performance_similarity
 
         self.__optimized_algorithm = algorithms[0]
-
-        # check if the provided optimization problem is correct
-        if not isinstance(self.problem, Problem):
-            raise TypeError(f"Provided problem type `{type(self.problem).__name__}` is not compatible.")
 
     def __create_folder_structure(self, prefix: str | None = None, suffix: str | None = None):
         r"""Create folder structure for the meta genetic algorithm.
@@ -196,7 +191,15 @@ class MetaGA:
         if prefix is None:
             prefix = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
         if suffix is None:
-            suffix = "_".join([self.__optimized_algorithm.Name[1], self.problem.name()])
+            if self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
+                suffix = "_".join(
+                    [
+                        f"{self.__target_algorithm.Name[1]}-{self.__optimized_algorithm.Name[1]}",
+                        self.problem.name(),
+                    ]
+                )
+            else:
+                suffix = "_".join([self.__optimized_algorithm.Name[1], self.problem.name()])
         self.archive_path = os.path.join(
             self.base_archive_path,
             "_".join([prefix, suffix]),
@@ -279,14 +282,14 @@ class MetaGA:
     @staticmethod
     def on_generation_progress(ga: pygad.GA):
         r"""Called after each genetic algorithm generation."""
-        ga.logger.info(f"Generation = {ga.generations_completed}")
-        ga.logger.info(f"->Fitness  = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[1]}")
-        ga.logger.info(f"->Solution = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[0]}")
+        ga.logger.info(f"{ga.generations_completed}_Meta-GA_generation")
+        ga.logger.info(f"|-> Fitness  = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[1]}")
+        ga.logger.info(f"|-> Solution = {ga.best_solution(pop_fitness=ga.last_generation_fitness)[0]}")
 
     def __clean_tmp_data(self):
         r"""Clean up temporary data created by the meta genetic algorithm."""
         try:
-            print("Cleaning up meta GA temporary data...")
+            print("Cleaning up meta-GA temporary data...")
             if os.path.exists(self.__meta_ga_tmp_data_path):
                 shutil.rmtree(self.__meta_ga_tmp_data_path)
         except Exception:
@@ -382,27 +385,31 @@ class MetaGA:
         self,
         filename="meta_ga_obj",
         plot_filename="meta_ga_fitness_plot",
+        plot_title="Meta-GA Fitness",
         log_filename="meta_ga_log_file",
         target_algorithm: Algorithm | None = None,
         get_info: bool = False,
         prefix: str | None = None,
         suffix: str | None = None,
         return_best_solution: bool = False,
+        log_headline="Meta-GA_log",
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
         Args:
             filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
             plot_filename (Optional[str]): Name of the fitness plot image file.
+            plot_title (Optional[str]): Title of the fitness plot.
             log_filename (Optional[str]): Name of the generated log file.
-            target_algorithm (Optional[Algorithm]): Target algorithm for the performance similarity evaluation.
+            target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity evaluation.
                 Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
             prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current
                 datetime by default.
             suffix (Optional[str]): Use custom suffix for the name of the base folder in structure. Uses the
                 abbreviation of the selected algorithm and name of the optimization problem by default.
-            return_best_solution (Optional[bool]): returns best solution if True.
+            return_best_solution (Optional[bool]): Returns best solution if True.
+            log_headline (Optional[str]): First line to be written to the log.
 
         Returns:
             best_solution (numpy.ndarray[float] | None): Returns best solution.
@@ -410,16 +417,19 @@ class MetaGA:
         Raises:
             ValueError: `target_algorithm` was not provided when required.
         """
-        if (
-            self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY
-            and target_algorithm is None
-        ):
-            raise ValueError(
-                """target_algorithm must be defined when running optimization with
-                fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."""
-            )
-        else:
-            self.__target_algorithm = target_algorithm
+        if self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
+            if target_algorithm is None:
+                raise ValueError(
+                    """target_algorithm must be defined when running optimization with
+                    fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."""
+                )
+            elif target_algorithm.population_size != self.pop_size:
+                raise Warning(
+                    """`pop_size` of the `target_algorithm` does not match
+                    the one used for the optimized algorithm."""
+                )
+            else:
+                self.__target_algorithm = target_algorithm
 
         self.__create_folder_structure(prefix=prefix, suffix=suffix)
         self.__before_meta_optimization()
@@ -456,14 +466,18 @@ class MetaGA:
             logger=self.__get_logger(filename=os.path.join(self.archive_path, log_filename)),
         )
 
+        self.meta_ga.logger.info(log_headline)
         self.meta_ga.run()
         self.__clean_tmp_data()
 
         self.meta_ga.logger.handlers.clear()
         self.meta_ga.save(os.path.join(self.archive_path, filename))
-        self.meta_ga.plot_fitness(save_dir=os.path.join(self.archive_path, f"{plot_filename}.png"))
+        self.meta_ga.plot_fitness(
+            title=plot_title,
+            save_dir=os.path.join(self.archive_path, f"{plot_filename}.png"),
+        )
         best_solutions = self.meta_ga.best_solutions
-        print(f"Best solution: {best_solutions[-1]}")
+        print(f"{self.__optimized_algorithm.Name[1]} best solution: {best_solutions[-1]}")
 
         if return_best_solution:
             return np.array(best_solutions[-1])
@@ -492,7 +506,7 @@ class MetaGA:
         gv.attr("graph", fontname="bold")
 
         with gv.subgraph(name="cluster_0") as c:
-            c.attr(style="filled", color=graph_color, name="meta_ga", label="Meta GA")
+            c.attr(style="filled", color=graph_color, name="meta_ga", label="Meta-GA")
             c.node_attr.update(
                 style="filled",
                 color=table_border_color,
@@ -557,12 +571,37 @@ class MetaGA:
                 </table>>"""
             c.node(name="meta_ga_parameters", label=meta_ga_parameters_label)
 
+            if self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
+                with c.subgraph(name="cluster_01") as cc:
+                    cc.attr(
+                        style="filled",
+                        color=sub_graph_color,
+                        name="target_algorithm",
+                        label="Target Algorithm",
+                    )
+                    cc.node_attr.update(
+                        style="filled",
+                        color=table_border_color,
+                        fillcolor=table_background_color,
+                        shape="plaintext",
+                        margin="0",
+                    )
+                    node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
+                    <tr>
+                        <td colspan="2"><b>{self.__target_algorithm.Name[1]}</b></td>
+                    </tr>
+                    <tr>
+                        <td>pop size</td>
+                        <td>{self.pop_size}</td>
+                    </tr></table>>"""
+                    cc.node(name=f"target_gene_space", label=node_label)
+
             with c.subgraph(name="cluster_00") as cc:
                 cc.attr(
                     style="filled",
                     color=sub_graph_color,
-                    name="meta_ga_algorithms",
-                    label="Algorithms",
+                    name="optimized_algorithm",
+                    label="Optimized Algorithm",
                 )
                 cc.node_attr.update(
                     style="filled",
@@ -572,25 +611,23 @@ class MetaGA:
                     margin="0",
                 )
                 combined_gene_space_len = 0
-                for alg_idx, alg_name in enumerate(list(self.gene_spaces)):
-                    algorithm = get_algorithm_by_name(alg_name)
-
-                    node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
-                        <tr>
-                            <td colspan="2"><b>{algorithm.Name[1]}</b></td>
-                        </tr>
-                        <tr>
-                            <td>pop size</td>
-                            <td>{self.pop_size}</td>
-                        </tr>"""
-                    for setting in self.gene_spaces[alg_name]:
-                        gene = ", ".join(str(value) for value in self.gene_spaces[alg_name][setting].values())
-                        combined_gene_space_len += 1
-                        node_label += f"""<tr>
-                            <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
-                        </tr>"""
-                    node_label += "</table>>"
-                    cc.node(name=f"gene_space_{alg_idx}", label=node_label)
+                alg_name = self.__optimized_algorithm.__class__.__name__
+                node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
+                    <tr>
+                        <td colspan="2"><b>{self.__optimized_algorithm.Name[1]}</b></td>
+                    </tr>
+                    <tr>
+                        <td>pop size</td>
+                        <td>{self.pop_size}</td>
+                    </tr>"""
+                for setting in self.gene_spaces[alg_name]:
+                    gene = ", ".join(str(value) for value in self.gene_spaces[alg_name][setting].values())
+                    combined_gene_space_len += 1
+                    node_label += f"""<tr>
+                        <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
+                    </tr>"""
+                node_label += "</table>>"
+                cc.node(name=f"gene_space", label=node_label)
 
                 combined_gene_string = f"""<
                 <table border="0" cellborder="1" cellspacing="0">
@@ -606,9 +643,7 @@ class MetaGA:
                     </tr>
                 </table>>"""
                 cc.node(name="combined_gene_space", label=combined_gene_string)
-
-                for alg_idx in range(len(self.gene_spaces)):
-                    cc.edge(f"gene_space_{alg_idx}", "combined_gene_space")
+                cc.edge(f"gene_space", "combined_gene_space")
 
         with gv.subgraph(name="cluster_1") as c:
             c.attr(
@@ -728,6 +763,14 @@ class MetaGA:
             label="for each \nsolution",
             lhead="cluster_1",
         )
+        if self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
+            gv.edge(
+                minlen="2",
+                tail_name="target_gene_space",
+                head_name="optimization_parameters",
+                label="target \nsolution",
+                lhead="cluster_1",
+            )
         gv.edge(
             tail_name="optimization_parameters",
             head_name="pop_scheme",
@@ -740,7 +783,7 @@ class MetaGA:
             label=(
                 "average fitness \nof runs"
                 if self.fitness_function_type == MetaGAFitnessFunction.PARAMETER_TUNING
-                else "cosine distance \nof average feature vectors\nof target and optimized algorithm"
+                else "Sim_SMAPE"
             ),
             ltail="cluster_1",
         )

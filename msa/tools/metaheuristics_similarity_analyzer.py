@@ -41,7 +41,7 @@ class MetaheuristicsSimilarityAnalyzer:
     r"""Class for search and analysis of similarity of metaheuristics with
     different parameter settings. Uses target metaheuristic with stochastically
     selected parameters and aims to find parameters of the optimized
-    metaheuristic with which they perform in a similar maner.
+    metaheuristic with which they perform in a similar manner.
     """
 
     # TODO add attributes
@@ -55,7 +55,7 @@ class MetaheuristicsSimilarityAnalyzer:
         r"""Initialize the metaheuristic similarity analyzer.
 
         Args:
-            meta_ga (Optional[MetaGA]): Preconfigured instance of the meta
+            meta_ga (Optional[MetaGA]): Pre-configured instance of the meta
                 genetic algorithm with fitness function set to
                 `TARGET_PERFORMANCE_SIMILARITY`.
             target_gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]):
@@ -91,7 +91,10 @@ class MetaheuristicsSimilarityAnalyzer:
         self._base_archive_path = base_archive_path
 
     def __generate_targets_and_folder_structure(
-        self, num_comparisons: int, generate_optimized_targets: bool = False, prefix: str | None = None
+        self,
+        num_comparisons: int,
+        generate_optimized_targets: bool = False,
+        prefix: str | None = None,
     ):
         r"""Generate target solutions and folder structure.
 
@@ -105,7 +108,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 folder in structure. Uses current datetime by default.
 
         Raises:
-            ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
+            NameError: Algorithm does not have the attribute provided in the `gene_spaces`.
         """
         low_ranges = []
         high_ranges = []
@@ -345,20 +348,29 @@ class MetaheuristicsSimilarityAnalyzer:
                 filename=os.path.join(self.archive_path, "msa_info"),
             )
 
-        for idx, target_solution in enumerate(self.target_solutions):
+        for comparison_idx, target_solution in enumerate(self.target_solutions):
             target_algorithm = MetaGA.solution_to_algorithm_attributes(
                 solution=target_solution,
                 gene_spaces=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
-            self.meta_ga.run_meta_ga(target_algorithm=target_algorithm, prefix=str(idx), suffix="comparison")
+            logger_headline = f"\n======> {comparison_idx}/{len(self.target_solutions)-1}_COMPARISON_{self.target_alg_abbr}-{self.optimized_alg_abbr} <======"
+            logger_headline += f"\n|-> {self.target_alg_abbr} target = {target_solution}"
+            plot_title = f"{comparison_idx} Comparison {self.target_alg_abbr}-{self.optimized_alg_abbr} Meta-GA Fitness"
+            self.meta_ga.run_meta_ga(
+                plot_title=plot_title,
+                target_algorithm=target_algorithm,
+                prefix=str(comparison_idx),
+                suffix="comparison",
+                log_headline=logger_headline,
+            )
             if self.meta_ga.meta_ga is not None:
                 self.optimized_solutions.append(self.meta_ga.meta_ga.best_solutions[-1])
 
         if generate_dataset:
             self.generate_dataset_from_solutions()
             if calculate_similarity_metrics:
-                print("Calculating similarity metrics...")
+                print("\nCalculating similarity metrics...")
                 self.calculate_similarity_metrics()
         if export:
             print("Exporting .pkl file...")
@@ -517,15 +529,14 @@ class MetaheuristicsSimilarityAnalyzer:
         k_svm_scores = np.array(_k_svm_scores)
         knn_scores = np.array(_knn_scores)
 
-        bar_width = 0.35
-        (
-            fig,
-            ax,
-        ) = plt.subplots(2, 1, figsize=(15, 10))
-        fig.subplots_adjust(hspace=0.5)
-
         # bar charts
         if bar_chart_filename is not None:
+            bar_width = 0.35
+            (
+                fig,
+                ax,
+            ) = plt.subplots(2, 1, figsize=(15, 10))
+            fig.subplots_adjust(hspace=0.5)
             index = np.arange(1, len(k_svm_scores[:, 0]) + 1)
             low = np.min(k_svm_scores)
             high = np.max(k_svm_scores)
@@ -734,8 +745,20 @@ class MetaheuristicsSimilarityAnalyzer:
         ]
 
         # Add rows
-        for idx, (target, optimized, smape, cosine, rho, svm_test, knn_test) in enumerate(
-            zip(self.target_solutions, self.optimized_solutions, *displayed_similarity_metrics)
+        for idx, (
+            target,
+            optimized,
+            smape,
+            cosine,
+            rho,
+            svm_test,
+            knn_test,
+        ) in enumerate(
+            zip(
+                self.target_solutions,
+                self.optimized_solutions,
+                *displayed_similarity_metrics,
+            )
         ):
             cells = [f"{idx + 1}"]
             for t in target:
@@ -950,7 +973,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 cc.edge(
                     "target_gene_space",
                     "target_parameters",
-                    label="random set \nof target \nparameter settings",
+                    label="target solution",
                 )
 
         with gv.subgraph(name="cluster_1") as c:
@@ -958,7 +981,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 style="filled",
                 color=graph_color,
                 name="meta_ga",
-                label="Meta GA",
+                label="Meta-GA",
             )
             c.node_attr.update(
                 style="filled",
@@ -1031,8 +1054,8 @@ class MetaheuristicsSimilarityAnalyzer:
             )
 
             c.node(
-                name="cosine_similarity",
-                label="Cosine similarity",
+                name="sim_smape",
+                label="Sim_SMAPE",
                 color=table_border_color,
                 margin="0.1,0,0.1,0",
             )
@@ -1091,7 +1114,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 for alg_idx in range(len(self.meta_ga.gene_spaces)):
                     cc.edge(f"gene_space_{alg_idx}", "combined_gene_space")
 
-            c.edge("cosine_similarity", "combined_gene_space:gene_fitness")
+            c.edge("sim_smape", "combined_gene_space:gene_fitness")
 
         with gv.subgraph(name="cluster_2") as c:
             c.attr(
@@ -1254,12 +1277,12 @@ class MetaheuristicsSimilarityAnalyzer:
         gv.edge(
             tail_name="target_parameters",
             head_name="optimization_parameters",
-            label="for every set of \ntarget parameters",
+            label="for each target \nsolution",
             lhead="cluster_2",
         )
         gv.edge(
             tail_name="pop_metrics",
-            head_name="cosine_similarity",
+            head_name="sim_smape",
             label="average feature vectors \nof target and optimized \nalgorithms \ndiversity metrics",
             ltail="cluster_2",
         )
