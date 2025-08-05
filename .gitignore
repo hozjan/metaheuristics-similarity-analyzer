@@ -2,7 +2,6 @@
 !msa
 !msa/__init__.py
 !msa/util
-!msa/util/constants.py
 !msa/util/helper.py
 !msa/util/__init__.py
 
@@ -47,7 +46,7 @@
 !tests
 !tests/__init__.py
 !tests/test_parameter_tuning.py
-!tests/test_similarity_analisys.py
+!tests/test_similarity_analysis.py
 !tests/diversity_metrics_tests
 !tests/diversity_metrics_tests/__init__.py
 !tests/diversity_metrics_tests/test_individual_metrics.py
