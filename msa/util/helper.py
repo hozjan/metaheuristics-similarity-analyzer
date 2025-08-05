@@ -1,13 +1,14 @@
 import numpy as np
 import numpy.typing as npt
 import math
+import time
 from niapy.algorithms.algorithm import Algorithm
 from niapy.util.factory import (
     _algorithm_options,
     get_algorithm,
 )
 
-__all__ = ["random_float_with_step", "smape", "get_algorithm_by_name"]
+__all__ = ["random_float_with_step", "smape", "get_algorithm_by_name", "timer"]
 
 
 def random_float_with_step(low, high, step, size=None, replace=True):
@@ -51,3 +52,9 @@ def get_algorithm_by_name(name: str | Algorithm, *args, **kwargs):
         raise KeyError(f"Could not find algorithm by name `{name}` in the niapy framework.")
     else:
         return get_algorithm(name, *args, **kwargs)
+
+
+def timer(start, end):
+    hours, rem = divmod(end - start, 3600)
+    minutes, seconds = divmod(rem, 60)
+    return "{:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds)

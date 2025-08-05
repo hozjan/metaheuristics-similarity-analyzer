@@ -11,13 +11,15 @@ from msa.tools.optimization_data import (
     IndivDiversityMetric,
     PopDiversityMetric,
 )
-from msa.util.helper import get_algorithm_by_name
+from msa.util.helper import get_algorithm_by_name, timer
 import shutil
 import logging
 import graphviz
 from enum import Enum
 import os
-import pylatex
+import time
+import warnings
+import matplotlib.pyplot as plt
 
 
 class MetaGAFitnessFunction(Enum):
@@ -391,7 +393,6 @@ class MetaGA:
         get_info: bool = False,
         prefix: str | None = None,
         suffix: str | None = None,
-        return_best_solution: bool = False,
         log_headline="Meta-GA_log",
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
@@ -408,14 +409,14 @@ class MetaGA:
                 datetime by default.
             suffix (Optional[str]): Use custom suffix for the name of the base folder in structure. Uses the
                 abbreviation of the selected algorithm and name of the optimization problem by default.
-            return_best_solution (Optional[bool]): Returns best solution if True.
             log_headline (Optional[str]): First line to be written to the log.
 
         Returns:
-            best_solution (numpy.ndarray[float] | None): Returns best solution.
+            best_solution (numpy.ndarray[float]): Returns best solution.
 
         Raises:
             ValueError: `target_algorithm` was not provided when required.
+            ValueError: `population_size` of `target_algorithm` incorrect.
         """
         if self.fitness_function_type == MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY:
             if target_algorithm is None:
@@ -424,13 +425,15 @@ class MetaGA:
                     fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`."""
                 )
             elif target_algorithm.population_size != self.pop_size:
-                raise Warning(
-                    """`pop_size` of the `target_algorithm` does not match
+                raise ValueError(
+                    """`population_size` of the `target_algorithm` does not match
                     the one used for the optimized algorithm."""
                 )
             else:
                 self.__target_algorithm = target_algorithm
 
+        warnings.filterwarnings("ignore", category=UserWarning)
+        start = time.time()
         self.__create_folder_structure(prefix=prefix, suffix=suffix)
         self.__before_meta_optimization()
 
@@ -468,9 +471,10 @@ class MetaGA:
 
         self.meta_ga.logger.info(log_headline)
         self.meta_ga.run()
+        self.meta_ga.logger.info(f"Time elapsed: {timer(start, time.time())}")
+        self.meta_ga.logger.handlers.clear()
         self.__clean_tmp_data()
 
-        self.meta_ga.logger.handlers.clear()
         self.meta_ga.save(os.path.join(self.archive_path, filename))
         self.meta_ga.plot_fitness(
             title=plot_title,
@@ -479,8 +483,7 @@ class MetaGA:
         best_solutions = self.meta_ga.best_solutions
         print(f"{self.__optimized_algorithm.Name[1]} best solution: {best_solutions[-1]}")
 
-        if return_best_solution:
-            return np.array(best_solutions[-1])
+        return np.array(best_solutions[-1])
 
     def meta_ga_info(
         self,

@@ -2,6 +2,7 @@ from datetime import datetime
 from pathlib import Path
 import warnings
 import os
+import time
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import (
@@ -14,7 +15,7 @@ from matplotlib import pyplot as plt
 from pylatex import Document, Section, Subsection
 from pylatex import MultiColumn, Package, LongTable
 from pylatex.utils import bold, NoEscape
-from msa.util.helper import random_float_with_step, get_algorithm_by_name
+from msa.util.helper import random_float_with_step, get_algorithm_by_name, timer
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from msa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
 from msa.tools.optimization_data import SingleRunData
@@ -347,7 +348,8 @@ class MetaheuristicsSimilarityAnalyzer:
             self.msa_info(
                 filename=os.path.join(self.archive_path, "msa_info"),
             )
-
+        
+        start = time.time()
         for comparison_idx, target_solution in enumerate(self.target_solutions):
             target_algorithm = MetaGA.solution_to_algorithm_attributes(
                 solution=target_solution,
@@ -367,16 +369,18 @@ class MetaheuristicsSimilarityAnalyzer:
             if self.meta_ga.meta_ga is not None:
                 self.optimized_solutions.append(self.meta_ga.meta_ga.best_solutions[-1])
 
+        print(f"\nAnalysis completed in: {timer(start, time.time())}")
         if generate_dataset:
+            print("Generating dataset...")
             self.generate_dataset_from_solutions()
             if calculate_similarity_metrics:
-                print("\nCalculating similarity metrics...")
+                print("Calculating similarity metrics...")
                 self.calculate_similarity_metrics()
         if export:
             print("Exporting .pkl file...")
             self.export_to_pkl(pkl_filename)
 
-        print("All done!")
+        print(f"\nAll done in: {timer(start, time.time())}")
 
     def export_to_pkl(self, filename):
         """
