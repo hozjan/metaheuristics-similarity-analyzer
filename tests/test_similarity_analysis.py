@@ -10,6 +10,7 @@ from msa.diversity_metrics.individual_diversity.idt import IDT
 from msa.diversity_metrics.individual_diversity.isi import ISI
 from msa.diversity_metrics.individual_diversity.ifm import IFM
 from msa.diversity_metrics.individual_diversity.ifiqr import IFIQR
+from msa.tools.optimization_tools import get_sorted_list_of_runs
 from niapy.problems.schwefel import Schwefel
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
@@ -99,19 +100,14 @@ class TestTargetSimilarity(TestCase):
         )
         analyzer.export_results_to_latex(generate_pdf=True)
         archive_path = analyzer.archive_path
-        imported_analyzer = analyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
+        imported_analyzer = MetaheuristicsSimilarityAnalyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
 
         # Assert
-        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_comparison")
-        self.assertEquals(len(dataset_dir), 2)
-        first_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[0])
-        )
-        second_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[1])
-        )
-        self.assertEquals(len(first_dir), num_runs)
-        self.assertEquals(len(second_dir), num_runs)
+        dataset_path = os.path.join(imported_analyzer.dataset_path, "0_comparison")
+        first_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.target_alg_abbr)
+        second_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.optimized_alg_abbr)
+        self.assertEquals(len(first_runs), num_runs)
+        self.assertEquals(len(second_runs), num_runs)
         self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))
         self.assertTrue(any(fname.endswith(".tex") for fname in os.listdir(archive_path)))
         self.assertTrue(any(fname.endswith(".pkl") for fname in os.listdir(archive_path)))
@@ -162,19 +158,14 @@ class TestTargetSimilarity(TestCase):
         )
         analyzer.export_results_to_latex(generate_pdf=True)
         archive_path = analyzer.archive_path
-        imported_analyzer = analyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
+        imported_analyzer = MetaheuristicsSimilarityAnalyzer.import_from_pkl(f"{archive_path}/{pkl_filename}")
 
         # Assert
-        dataset_dir = os.listdir(f"{imported_analyzer.dataset_path}/0_comparison")
-        self.assertEquals(len(dataset_dir), 2)
-        first_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[0])
-        )
-        second_dir = os.listdir(
-            os.path.join(imported_analyzer.dataset_path, "0_comparison", dataset_dir[1])
-        )
-        self.assertEquals(len(first_dir), num_runs)
-        self.assertEquals(len(second_dir), num_runs)
+        dataset_path = os.path.join(imported_analyzer.dataset_path, "0_comparison")
+        first_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.target_alg_abbr)
+        second_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.optimized_alg_abbr)
+        self.assertEquals(len(first_runs), num_runs)
+        self.assertEquals(len(second_runs), num_runs)
         self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))
         self.assertTrue(any(fname.endswith(".tex") for fname in os.listdir(archive_path)))
         self.assertTrue(any(fname.endswith(".pkl") for fname in os.listdir(archive_path)))

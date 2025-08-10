@@ -20,6 +20,8 @@ import os
 import time
 import warnings
 import matplotlib.pyplot as plt
+import cloudpickle
+from PIL import Image
 
 
 class MetaGAFitnessFunction(Enum):
@@ -386,8 +388,6 @@ class MetaGA:
     def run_meta_ga(
         self,
         filename="meta_ga_obj",
-        plot_filename="meta_ga_fitness_plot",
-        plot_title="Meta-GA Fitness",
         log_filename="meta_ga_log_file",
         target_algorithm: Algorithm | None = None,
         get_info: bool = False,
@@ -398,9 +398,7 @@ class MetaGA:
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
         Args:
-            filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
-            plot_filename (Optional[str]): Name of the fitness plot image file.
-            plot_title (Optional[str]): Title of the fitness plot.
+            filename (Optional[str]): Name of the .pkl file for this Meta-GA instance to be exported to.
             log_filename (Optional[str]): Name of the generated log file.
             target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity evaluation.
                 Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
@@ -474,17 +472,101 @@ class MetaGA:
         self.meta_ga.logger.info(f"Time elapsed: {timer(start, time.time())}")
         self.meta_ga.logger.handlers.clear()
         self.__clean_tmp_data()
-
-        self.meta_ga.save(os.path.join(self.archive_path, filename))
-        self.meta_ga.plot_fitness(
-            title=plot_title,
-            save_dir=os.path.join(self.archive_path, f"{plot_filename}.png"),
-        )
         best_solutions = self.meta_ga.best_solutions
         print(f"{self.__optimized_algorithm.Name[1]} best solution: {best_solutions[-1]}")
+        self.export_to_pkl(filename)
 
         return np.array(best_solutions[-1])
 
+    def export_to_pkl(self, filename):
+        """
+        Export instance of the meta-GA as .pkl.
+
+        Args:
+            filename (str): Filename of the output file. File extension .pkl included upon export.
+        """
+        filename = os.path.join(self.archive_path, filename)
+        meta_ga = cloudpickle.dumps(self)
+        with open(filename + ".pkl", "wb") as file:
+            file.write(meta_ga)
+            cloudpickle.dump(self, file)
+
+    @staticmethod
+    def import_from_pkl(filename) -> "MetaGA":
+        """
+        Import saved instance of the meta-GA.
+
+        Args:
+            filename (str): Filename of the file to import. File extension .pkl included upon import.
+
+        Returns:
+            msa (MetaGA): Meta-GA instance.
+
+        Raises:
+            FileNotFoundError: File not found.
+            BaseException: File could not be loaded.
+        """
+
+        try:
+            with open(filename + ".pkl", "rb") as file:
+                meta_ga = cloudpickle.load(file)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File {filename}.pkl not found.")
+        except Exception:
+            raise BaseException(f"File {filename}.pkl could not be loaded.")
+        return meta_ga
+
+    def plot_solutions(self, title: str, file_path: str, all_solutions: bool = False):
+        r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
+
+        Arguments:
+            title (str): Title of the plot.
+            file_path (Optional[str]): File path including filename of the file saved.
+                File extension .png included automatically.
+            all_solutions (Optional[str]): Plot evolution including all solutions.
+                If false only the best solution of each generation is plotted.
+        """
+        warnings.filterwarnings("ignore", category=UserWarning)
+        solutions = "all" if all_solutions else "best"
+        # Switch to non-interactive backend to prevent
+        # the unmodified figure from showing.
+        original_backend = plt.get_backend()
+        plt.switch_backend("agg")
+        original_fig = self.meta_ga.plot_genes(solutions=solutions, plot_type="scatter")
+        plt.switch_backend(original_backend)
+        # Improve figure and add setting labels.
+        original_fig.subplots_adjust(wspace=0.2, hspace=0.1)
+        original_fig.suptitle(title, fontsize = 20)
+        for alg_name in self.gene_spaces:
+            for idx, setting in enumerate(self.gene_spaces[alg_name]):
+                original_fig.axes[idx].axes.set_xlabel("Solution", fontsize = 14)
+                original_fig.axes[idx].axes.set_ylabel("Value", fontsize = 14)
+                original_fig.axes[idx].axes.set_title(setting, fontsize = 16)
+        original_fig.tight_layout()
+        original_fig.savefig(file_path)
+        plt.close("all")
+        # Load and display the saved image
+        img = Image.open(f"{file_path}.png")
+        plt.figure(figsize=(img.width / 100, img.height / 100), dpi=100)
+        plt.imshow(img)
+        plt.axis('off')
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        plt.show()
+    
+    def plot_fitness(self, title: str, file_path: str):
+        r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
+
+        Arguments:
+            title (Optional[str]): Title of the fitness plot.
+            file_path (Optional[str]): File path including filename of the file saved.
+                File extension .png included automatically.
+        """
+        warnings.filterwarnings("ignore", category=UserWarning)
+        self.meta_ga.plot_fitness(
+            title=title,
+            save_dir=f"{file_path}.png",
+        )
+    
     def meta_ga_info(
         self,
         filename: str = "meta_ga_info",

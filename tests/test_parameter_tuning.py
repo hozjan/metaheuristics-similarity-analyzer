@@ -60,9 +60,8 @@ class TestParameterTuning(TestCase):
         meta_ga_filename = "meta_ga_obj"
         meta_ga.run_meta_ga(filename=meta_ga_filename)
         archive_path = meta_ga.archive_path
-        meta_ga_save = pygad.load(os.path.join(archive_path, meta_ga_filename))
+        meta_ga_save = MetaGA.import_from_pkl(os.path.join(archive_path, meta_ga_filename))
 
         # Assert
         self.assertIsNotNone(meta_ga_save)
         self.assertTrue(any(fname.endswith(".txt") for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith(".png") for fname in os.listdir(archive_path)))
