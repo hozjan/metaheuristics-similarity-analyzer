@@ -26,6 +26,7 @@ import graphviz
 import cloudpickle
 from niapy.algorithms import Algorithm
 from enum import Enum
+import pandas as pd
 
 __all__ = ["MetaheuristicsSimilarityAnalyzer", "SimilarityMetrics"]
 
@@ -439,9 +440,14 @@ class MetaheuristicsSimilarityAnalyzer:
         Returns:
             (comparison_path, MetaGA) (tuple[str, MetaGA]): Path to the folder structure
                 depending on the current context and the imported MetaGA object.
+
+        Raises:
+            ValueError: `comparison_index` out of range.
         """
         if comparison_index > len(self.optimized_solutions) - 1:
-            raise ValueError("Comparison index out of range.")
+            raise ValueError(
+                f"`comparison_index` {comparison_index} out of range [0, {len(self.optimized_solutions) - 1}]."
+            )
         comparison_dir = "_".join([str(comparison_index), self.__comparison_dir_suffix])
         if self.__absolute_dirname is not None:
             comparison_path = os.path.join(self.__absolute_dirname, comparison_dir)
@@ -461,9 +467,12 @@ class MetaheuristicsSimilarityAnalyzer:
                 File is saved under the corresponding comparisons directory.
             all_solutions (Optional[str]): Plot evolution including all solutions.
                 If false only the best solutions of each generation are plotted.
+
+        Raises:
+            ValueError: `comparison_index` out of range.
         """
         comparison_path, imported_meta_ga = self.__import_comparison_meta_ga(comparison_index)
-        title = f"{comparison_index} Comparison solutions"
+        title = f"{comparison_index} comparison solutions"
         file_path = os.path.join(comparison_path, filename)
         imported_meta_ga.plot_solutions(title, file_path, all_solutions=all_solutions)
 
@@ -474,11 +483,148 @@ class MetaheuristicsSimilarityAnalyzer:
             comparison_index (int): Index of the comparison to create a plot for.
             filename (Optional[str]): Filename of the .png file saved.
                 File is saved under the corresponding comparisons directory.
+
+        Raises:
+            ValueError: `comparison_index` out of range.
         """
         comparison_path, imported_meta_ga = self.__import_comparison_meta_ga(comparison_index)
         file_path = os.path.join(comparison_path, filename)
-        title = f"{comparison_index} Comparison {self.target_alg_abbr}-{self.optimized_alg_abbr} Meta-GA Fitness"
+        title = f"{comparison_index} comparison {self.target_alg_abbr}-{self.optimized_alg_abbr} Meta-GA Fitness"
         imported_meta_ga.plot_fitness(title, file_path)
+
+    def indiv_diversity_metrics_comparison(self, comparison_index: int, run_index: int):
+        r"""Creates and shows a figure showing the individual diversity metrics of both metaheuristics.
+
+        Arguments:
+            comparison_index (int): Index of the comparison to create a plot for.
+            run_index (Optional[str]): Index of the optimization run to plot the metrics for.
+
+        Raises:
+            ValueError: `comparison_index` out of range.
+            ValueError: `run_index` out of range.
+        """
+        if comparison_index > len(self.optimized_solutions) - 1:
+            raise ValueError(
+                f"`comparison_index` {comparison_index} out of range [0, {len(self.optimized_solutions) - 1}]."
+            )
+        comparison_dir = "_".join([str(comparison_index), self.__comparison_dir_suffix])
+        if self.__absolute_dirname is not None:
+            dataset_path = os.path.join(self.__absolute_dirname, self.__dataset_dirname, comparison_dir)
+        else:
+            dataset_path = os.path.join(self.archive_path, self.__dataset_dirname, comparison_dir)
+        target_runs = get_sorted_list_of_runs(dataset_path, self.target_alg_abbr)
+        optimized_runs = get_sorted_list_of_runs(dataset_path, self.optimized_alg_abbr)
+        if run_index >= len(target_runs) or run_index >= len(optimized_runs):
+            raise ValueError(f"`run_index` {str(run_index)} out of range [0, {len(target_runs) - 1}].")
+        target_run = SingleRunData.import_from_json(target_runs[run_index])
+        optimized_run = SingleRunData.import_from_json(optimized_runs[run_index])
+
+        target_metrics = target_run.get_indiv_diversity_metrics_values()
+        optimized_metrics = optimized_run.get_indiv_diversity_metrics_values()
+
+        plots_per_line = 4
+        num_metrics = len(self.meta_ga.indiv_diversity_metrics)
+        lines = int((num_metrics - 1) / plots_per_line) + 1
+        fig, axes = plt.subplots(lines, plots_per_line)
+        title = f"{comparison_index} comparison run {run_index} individual diversity metrics"
+        fig.suptitle(title, fontsize=23)
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.subplots_adjust(wspace=0.4, hspace=0.4)
+
+        for idx, metric in enumerate(self.meta_ga.indiv_diversity_metrics):
+            df_target_metric = target_metrics.filter(regex=metric.abbreviation())
+            df_target_metric.columns = df_target_metric.columns.str.replace(metric.abbreviation(), self.target_alg_abbr)
+            df_optimized_metric = optimized_metrics.filter(regex=metric.abbreviation())
+            df_optimized_metric.columns = df_optimized_metric.columns.str.replace(
+                metric.abbreviation(), self.optimized_alg_abbr
+            )
+            df_combined_metrics = pd.concat([df_target_metric, df_optimized_metric], axis=1)
+            ax = df_combined_metrics.plot(
+                ax=axes[int(idx / plots_per_line)][idx % plots_per_line] if lines > 1 else axes[idx],
+                kind="box",
+                widths=0.5,
+                figsize=(15, 5 * lines),
+                fontsize=15,
+            )
+            ax.set_title(label=metric.abbreviation(), fontdict={"fontsize": 20})
+        plt.show()
+
+    def pop_diversity_metrics_comparison(
+        self, comparison_index: int, run_index: int, title: str | None = None, separate: bool = False
+    ):
+        r"""Creates and shows a figure showing the population diversity metrics of both metaheuristics.
+
+        Arguments:
+            comparison_index (int): Index of the comparison to create a plot for.
+            run_index (Optional[str]): Index of the optimization run to plot the metrics for.
+            separate (Optional[bool]): Show diversity metrics on separate axes for better resolution.
+
+        Raises:
+            ValueError: `comparison_index` out of range.
+            ValueError: `run_index` out of range.
+        """
+        if comparison_index > len(self.optimized_solutions) - 1:
+            raise ValueError(
+                f"`comparison_index` {comparison_index} out of range [0, {len(self.optimized_solutions) - 1}]."
+            )
+        comparison_dir = "_".join([str(comparison_index), self.__comparison_dir_suffix])
+        if self.__absolute_dirname is not None:
+            dataset_path = os.path.join(self.__absolute_dirname, self.__dataset_dirname, comparison_dir)
+        else:
+            dataset_path = os.path.join(self.archive_path, self.__dataset_dirname, comparison_dir)
+        target_runs = get_sorted_list_of_runs(dataset_path, self.target_alg_abbr)
+        optimized_runs = get_sorted_list_of_runs(dataset_path, self.optimized_alg_abbr)
+        if run_index >= len(target_runs) or run_index >= len(optimized_runs):
+            raise ValueError(f"`run_index` {str(run_index)} out of range [0, {len(target_runs) - 1}].")
+        target_run = SingleRunData.import_from_json(target_runs[run_index])
+        optimized_run = SingleRunData.import_from_json(optimized_runs[run_index])
+        target_metrics = target_run.get_pop_diversity_metrics_values()
+        optimized_metrics = optimized_run.get_pop_diversity_metrics_values()
+
+        title = f"{comparison_index} comparison run {run_index} population diversity metrics"
+
+        if separate:
+            num_metrics = len(self.meta_ga.pop_diversity_metrics)
+            fig, axes = plt.subplots(num_metrics, 1)
+            fig.suptitle(title, fontsize=23)
+
+            for idx, metric in enumerate(self.meta_ga.pop_diversity_metrics):
+                df_target_metric = target_metrics.filter(regex=metric.abbreviation())
+                df_target_metric.columns = df_target_metric.columns.str.replace(
+                    metric.abbreviation(), self.target_alg_abbr
+                )
+                df_optimized_metric = optimized_metrics.filter(regex=metric.abbreviation())
+                df_optimized_metric.columns = df_optimized_metric.columns.str.replace(
+                    metric.abbreviation(), self.optimized_alg_abbr
+                )
+                df_combined_metrics = pd.concat([df_target_metric, df_optimized_metric], axis=1)
+                ax = df_combined_metrics.plot(
+                    ax=axes[idx],
+                    kind="line",
+                    figsize=(15, 3 * num_metrics),
+                    fontsize=15,
+                )
+                ax.set_title(label=metric.abbreviation(), fontdict={"fontsize": 20})
+            fig.tight_layout()
+        else:
+            target_metrics = target_metrics.add_suffix(f"_{self.target_alg_abbr}")
+            optimized_metrics = optimized_metrics.add_suffix(f"_{self.optimized_alg_abbr}")
+            df_combined_metrics = pd.concat([target_metrics, optimized_metrics], axis=1)
+            line_styles = ["-", ":", "--", "-."]
+            style = {}
+            for idx, metric in enumerate(self.meta_ga.pop_diversity_metrics):
+                if idx > 3:
+                    continue
+                style["_".join([metric.abbreviation(), self.target_alg_abbr])] = f"{line_styles[idx]}g"
+                style["_".join([metric.abbreviation(), self.optimized_alg_abbr])] = f"{line_styles[idx]}b"
+
+            fig, axes = plt.subplots(1, 1)
+            fig.suptitle(title, fontsize=23)
+            ax = df_combined_metrics.plot(ax=axes, style=style, figsize=(25, 7), logy=True, fontsize=15)
+            ax.legend(fontsize=15)
+            ax.set_xlabel(xlabel="Iterations", fontdict={"fontsize": 20})
+            fig.tight_layout()
+        plt.show()
 
     def svm_and_knn_classification_similarity_metrics(
         self,

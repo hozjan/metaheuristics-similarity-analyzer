@@ -536,12 +536,12 @@ class MetaGA:
         plt.switch_backend(original_backend)
         # Improve figure and add setting labels.
         original_fig.subplots_adjust(wspace=0.2, hspace=0.1)
-        original_fig.suptitle(title, fontsize = 20)
+        original_fig.suptitle(title, fontsize=20)
         for alg_name in self.gene_spaces:
             for idx, setting in enumerate(self.gene_spaces[alg_name]):
-                original_fig.axes[idx].axes.set_xlabel("Solution", fontsize = 14)
-                original_fig.axes[idx].axes.set_ylabel("Value", fontsize = 14)
-                original_fig.axes[idx].axes.set_title(setting, fontsize = 16)
+                original_fig.axes[idx].axes.set_xlabel("Solution", fontsize=14)
+                original_fig.axes[idx].axes.set_ylabel("Value", fontsize=14)
+                original_fig.axes[idx].axes.set_title(setting, fontsize=16)
         original_fig.tight_layout()
         original_fig.savefig(file_path)
         plt.close("all")
@@ -549,10 +549,10 @@ class MetaGA:
         img = Image.open(f"{file_path}.png")
         plt.figure(figsize=(img.width / 100, img.height / 100), dpi=100)
         plt.imshow(img)
-        plt.axis('off')
+        plt.axis("off")
         plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         plt.show()
-    
+
     def plot_fitness(self, title: str, file_path: str):
         r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
 
@@ -566,7 +566,7 @@ class MetaGA:
             title=title,
             save_dir=f"{file_path}.png",
         )
-    
+
     def meta_ga_info(
         self,
         filename: str = "meta_ga_info",
