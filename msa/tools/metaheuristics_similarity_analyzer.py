@@ -89,7 +89,7 @@ class MetaheuristicsSimilarityAnalyzer:
         self.archive_path = ""
         self.dataset_path = ""
         self.target_alg_abbr = get_algorithm_by_name(list(target_gene_space)[0]).Name[1]
-        self.optimized_alg_abbr = get_algorithm_by_name(list(self.meta_ga.gene_spaces)[0]).Name[1]
+        self.optimized_alg_abbr = get_algorithm_by_name(list(self.meta_ga.gene_space)[0]).Name[1]
         self._base_archive_path = base_archive_path
         self.__meta_ga_pkl_filename = "meta_ga_export"
         self.__comparison_dir_suffix = "comparison"
@@ -114,7 +114,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 folder in structure. Uses current datetime by default.
 
         Raises:
-            NameError: Algorithm does not have the attribute provided in the `gene_spaces`.
+            NameError: Algorithm does not have the attribute provided in the `gene_space`.
         """
         low_ranges = []
         high_ranges = []
@@ -145,7 +145,7 @@ class MetaheuristicsSimilarityAnalyzer:
                     ga_crossover_probability=self.meta_ga.ga_crossover_probability,
                     ga_mutation_num_genes=self.meta_ga.ga_mutation_num_genes,
                     ga_keep_elitism=self.meta_ga.ga_keep_elitism,
-                    gene_spaces=self.target_gene_space,
+                    gene_space=self.target_gene_space,
                     pop_size=self.meta_ga.pop_size,
                     max_evals=self.meta_ga.max_evals,
                     num_runs=self.meta_ga.num_runs,
@@ -241,12 +241,12 @@ class MetaheuristicsSimilarityAnalyzer:
 
             target_algorithm = MetaGA.solution_to_algorithm_attributes(
                 solution=target_solution,
-                gene_spaces=self.target_gene_space,
+                gene_space=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
             optimized_algorithm = MetaGA.solution_to_algorithm_attributes(
                 solution=optimized_solution,
-                gene_spaces=self.meta_ga.gene_spaces,
+                gene_space=self.meta_ga.gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
             for algorithm in (target_algorithm, optimized_algorithm):
@@ -362,7 +362,7 @@ class MetaheuristicsSimilarityAnalyzer:
         for comparison_idx, target_solution in enumerate(self.target_solutions):
             target_algorithm = MetaGA.solution_to_algorithm_attributes(
                 solution=target_solution,
-                gene_spaces=self.target_gene_space,
+                gene_space=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
             logger_headline = f"\n======> {comparison_idx}/{len(self.target_solutions)-1}_COMPARISON_{self.target_alg_abbr}-{self.optimized_alg_abbr} <======"
@@ -911,7 +911,7 @@ class MetaheuristicsSimilarityAnalyzer:
             "p{0.8cm} |"
             + " c" * len(self.target_gene_space[next(iter(self.target_gene_space))])
             + " |"
-            + " c" * len(self.meta_ga.gene_spaces[next(iter(self.meta_ga.gene_spaces))])
+            + " c" * len(self.meta_ga.gene_space[next(iter(self.meta_ga.gene_space))])
             + " |"
             + " c" * len(self.similarity_metrics)
         )
@@ -922,7 +922,7 @@ class MetaheuristicsSimilarityAnalyzer:
             data=self.target_alg_abbr,
         )
         mc_optimized = MultiColumn(
-            len(self.meta_ga.gene_spaces[next(iter(self.meta_ga.gene_spaces))]),
+            len(self.meta_ga.gene_space[next(iter(self.meta_ga.gene_space))]),
             align="c|",
             data=self.optimized_alg_abbr,
         )
@@ -938,8 +938,8 @@ class MetaheuristicsSimilarityAnalyzer:
         for alg_name in self.target_gene_space:
             for setting in self.target_gene_space[alg_name]:
                 cells.append(NoEscape(r" \rotatebox{90}{\makecell{" + setting.replace("_", "-") + "}} "))
-        for alg_name in self.meta_ga.gene_spaces:
-            for setting in self.meta_ga.gene_spaces[alg_name]:
+        for alg_name in self.meta_ga.gene_space:
+            for setting in self.meta_ga.gene_space[alg_name]:
                 cells.append(NoEscape(r" \rotatebox{90}{\makecell{" + setting.replace("_", "-") + "}} "))
 
         cells += [
@@ -1300,7 +1300,7 @@ class MetaheuristicsSimilarityAnalyzer:
                     margin="0",
                 )
                 combined_gene_space_len = 0
-                for alg_idx, alg_name in enumerate(self.meta_ga.gene_spaces):
+                for alg_idx, alg_name in enumerate(self.meta_ga.gene_space):
                     algorithm = get_algorithm_by_name(alg_name)
                     node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
                         <tr>
@@ -1310,8 +1310,8 @@ class MetaheuristicsSimilarityAnalyzer:
                             <td>pop size</td>
                             <td>{self.meta_ga.pop_size}</td>
                         </tr>"""
-                    for setting in self.meta_ga.gene_spaces[alg_name]:
-                        gene = ", ".join(str(value) for value in self.meta_ga.gene_spaces[alg_name][setting].values())
+                    for setting in self.meta_ga.gene_space[alg_name]:
+                        gene = ", ".join(str(value) for value in self.meta_ga.gene_space[alg_name][setting].values())
                         combined_gene_space_len += 1
                         node_label += (
                             f"<tr><td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td></tr>"
@@ -1334,7 +1334,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 </table>>"""
                 cc.node(name="combined_gene_space", label=combined_gene_string)
 
-                for alg_idx in range(len(self.meta_ga.gene_spaces)):
+                for alg_idx in range(len(self.meta_ga.gene_space)):
                     cc.edge(f"gene_space_{alg_idx}", "combined_gene_space")
 
             c.edge("sim_smape", "combined_gene_space:gene_fitness")
