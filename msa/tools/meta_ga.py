@@ -20,6 +20,8 @@ import os
 import time
 import warnings
 import matplotlib.pyplot as plt
+import cloudpickle
+from PIL import Image
 
 
 class MetaGAFitnessFunction(Enum):
@@ -48,7 +50,7 @@ class MetaGA:
         ga_crossover_probability: float,
         ga_mutation_num_genes: int,
         ga_keep_elitism: int,
-        gene_spaces: dict[str | Algorithm, dict[str, dict[str, float]]],
+        gene_space: dict[str | Algorithm, dict[str, dict[str, float]]],
         pop_size: int,
         problem: Problem,
         max_iters: int | float = np.inf,
@@ -75,7 +77,7 @@ class MetaGA:
             ga_crossover_probability (float): Crossover probability of the genetic algorithm [0,1].
             ga_mutation_num_genes (int): Number of genes mutated in the solution of the genetic algorithm.
             ga_keep_elitism (int): Number of solutions that are a part of the elitism of the genetic algorithm.
-            gene_spaces (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene spaces of the solution.
+            gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene space of the solution.
             pop_size (int): Population size of the metaheuristics being optimized.
             problem (Problem): Optimization problem used for optimization.
             max_iters (Optional[int | float]): Maximum number of iterations of the metaheuristic being optimized for
@@ -94,7 +96,7 @@ class MetaGA:
 
             ValueError: No diversity metrics defined when required.
             ValueError: Neither of `max_evals` or `max_iters` was assigned a finite value.
-            ValueError: Incorrect number of algorithms defined in the provided `gene_spaces`.
+            ValueError: Incorrect number of algorithms defined in the provided `gene_space`.
             TypeError: Provided `problem` is of incorrect type.
         """
 
@@ -108,14 +110,14 @@ class MetaGA:
         if max_evals == np.inf and max_iters == np.inf:
             raise ValueError("Defining a finite value for max_evals and/or max_iters is required.")
 
-        if len(gene_spaces) != 1:
-            raise ValueError("Only one algorithm must be defined in the `gene_spaces` provided.")
+        if len(gene_space) != 1:
+            raise ValueError("Only one algorithm must be defined in the `gene_space` provided.")
 
         if not isinstance(problem, Problem):
             raise TypeError(f"Provided problem type `{type(problem).__name__}` is not compatible.")
 
         self.fitness_function_type = fitness_function_type
-        self.gene_spaces = gene_spaces
+        self.gene_space = gene_space
         self.problem = problem
         self.ga_generations = ga_generations
         self.ga_solutions_per_pop = ga_solutions_per_pop
@@ -155,22 +157,22 @@ class MetaGA:
         Initialize meta genetic algorithm parameters and create folder structure.
 
         Raises:
-            ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
+            ValueError: Algorithm does not have the attribute provided in the `gene_space`.
         """
-        # check if all values in the provided gene spaces are correct and
+        # check if all values in the provided gene space are correct and
         # assemble combined gene space for met-GA
         algorithms = []
-        for alg_name in self.gene_spaces:
+        for alg_name in self.gene_space:
             algorithm = get_algorithm_by_name(alg_name)
             algorithms.append(algorithm)
-            for setting in self.gene_spaces[alg_name]:
+            for setting in self.gene_space[alg_name]:
                 if not hasattr(algorithm, setting):
                     raise ValueError(f"Algorithm `{alg_name}` has no attribute named `{setting}`.")
-                self.combined_gene_space.append(self.gene_spaces[alg_name][setting])
-                self.low_ranges.append(self.gene_spaces[alg_name][setting]["low"])
-                self.high_ranges.append(self.gene_spaces[alg_name][setting]["high"])
+                self.combined_gene_space.append(self.gene_space[alg_name][setting])
+                self.low_ranges.append(self.gene_space[alg_name][setting]["low"])
+                self.high_ranges.append(self.gene_space[alg_name][setting]["high"])
                 self.random_mutation_max_val.append(
-                    abs(self.gene_spaces[alg_name][setting]["high"] - self.gene_spaces[alg_name][setting]["low"]) * 0.5
+                    abs(self.gene_space[alg_name][setting]["high"] - self.gene_space[alg_name][setting]["low"]) * 0.5
                 )
                 self.random_mutation_min_val.append(-self.random_mutation_max_val[-1])
 
@@ -242,38 +244,38 @@ class MetaGA:
     @staticmethod
     def solution_to_algorithm_attributes(
         solution: list[float] | npt.NDArray,
-        gene_spaces: dict[str | Algorithm, dict[str, dict[str, float]]],
+        gene_space: dict[str | Algorithm, dict[str, dict[str, float]]],
         pop_size: int,
     ):
         r"""Apply meta genetic algorithm solution to an corresponding algorithm based on
-        the gene spaces used for the meta optimization. Make sure the solution matches the gene space.
+        the gene space used for the meta optimization. Make sure the solution matches the gene space.
 
         Args:
             solution (list[float | numpy.ndarray]): Meta genetic algorithm solution.
-            gene_spaces (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene spaces of the solution.
+            gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene space of the solution.
             pop_size (int): Population size of the algorithm returned.
 
         Returns:
             algorithm (Algorithm): Algorithm configured based on solution and gene_space.
 
         Raises:
-            ValueError: Argument `gene_spaces` must only contain one algorithm.
-            ValueError: The length of the provided solution does not match the number of attributes in `gene_spaces`.
-            ValueError: Algorithm does not have the attribute provided in the `gene_spaces`.
+            ValueError: Argument `gene_space` must only contain one algorithm.
+            ValueError: The length of the provided solution does not match the number of attributes in `gene_space`.
+            ValueError: Algorithm does not have the attribute provided in the `gene_space`.
         """
-        if len(gene_spaces) != 1:
-            raise ValueError("Argument `gene_spaces` must contain only one algorithm.")
+        if len(gene_space) != 1:
+            raise ValueError("Argument `gene_space` must contain only one algorithm.")
         settings_counter = 0
-        for alg_name in gene_spaces:
-            settings_counter += len(gene_spaces[alg_name])
+        for alg_name in gene_space:
+            settings_counter += len(gene_space[alg_name])
         if settings_counter != len(solution):
             raise ValueError("Solution length does not match the count of the gene space settings.")
 
         solution_iter = 0
         algorithms = []
-        for alg_name in gene_spaces:
+        for alg_name in gene_space:
             algorithm = get_algorithm_by_name(alg_name, population_size=pop_size)
-            for setting in gene_spaces[alg_name]:
+            for setting in gene_space[alg_name]:
                 if not hasattr(algorithm, setting):
                     raise ValueError(f"Algorithm `{alg_name}` has no attribute named `{setting}`.")
                 algorithm.__setattr__(setting, solution[solution_iter])
@@ -303,7 +305,7 @@ class MetaGA:
 
         meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
 
-        configured_algorithm = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
+        configured_algorithm = MetaGA.solution_to_algorithm_attributes(solution, self.gene_space, self.pop_size)
 
         # gather optimization data
         optimization_runner(
@@ -335,7 +337,7 @@ class MetaGA:
 
         meta_dataset = os.path.join(self.__meta_ga_tmp_data_path, f"{solution_idx}_{self.__meta_dataset}")
 
-        configured_algorithm = MetaGA.solution_to_algorithm_attributes(solution, self.gene_spaces, self.pop_size)
+        configured_algorithm = MetaGA.solution_to_algorithm_attributes(solution, self.gene_space, self.pop_size)
 
         # gather optimization data
         optimization_runner(
@@ -386,8 +388,6 @@ class MetaGA:
     def run_meta_ga(
         self,
         filename="meta_ga_obj",
-        plot_filename="meta_ga_fitness_plot",
-        plot_title="Meta-GA Fitness",
         log_filename="meta_ga_log_file",
         target_algorithm: Algorithm | None = None,
         get_info: bool = False,
@@ -398,9 +398,7 @@ class MetaGA:
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
         Args:
-            filename (Optional[str]): Name of the .pkl file of the GA object created during optimization.
-            plot_filename (Optional[str]): Name of the fitness plot image file.
-            plot_title (Optional[str]): Title of the fitness plot.
+            filename (Optional[str]): Name of the .pkl file for this Meta-GA instance to be exported to.
             log_filename (Optional[str]): Name of the generated log file.
             target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity evaluation.
                 Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
@@ -474,16 +472,100 @@ class MetaGA:
         self.meta_ga.logger.info(f"Time elapsed: {timer(start, time.time())}")
         self.meta_ga.logger.handlers.clear()
         self.__clean_tmp_data()
-
-        self.meta_ga.save(os.path.join(self.archive_path, filename))
-        self.meta_ga.plot_fitness(
-            title=plot_title,
-            save_dir=os.path.join(self.archive_path, f"{plot_filename}.png"),
-        )
         best_solutions = self.meta_ga.best_solutions
         print(f"{self.__optimized_algorithm.Name[1]} best solution: {best_solutions[-1]}")
+        self.export_to_pkl(filename)
 
         return np.array(best_solutions[-1])
+
+    def export_to_pkl(self, filename):
+        """
+        Export instance of the meta-GA as .pkl.
+
+        Args:
+            filename (str): Filename of the output file. File extension .pkl included upon export.
+        """
+        filename = os.path.join(self.archive_path, filename)
+        meta_ga = cloudpickle.dumps(self)
+        with open(filename + ".pkl", "wb") as file:
+            file.write(meta_ga)
+            cloudpickle.dump(self, file)
+
+    @staticmethod
+    def import_from_pkl(filename) -> "MetaGA":
+        """
+        Import saved instance of the meta-GA.
+
+        Args:
+            filename (str): Filename of the file to import. File extension .pkl included upon import.
+
+        Returns:
+            msa (MetaGA): Meta-GA instance.
+
+        Raises:
+            FileNotFoundError: File not found.
+            BaseException: File could not be loaded.
+        """
+
+        try:
+            with open(filename + ".pkl", "rb") as file:
+                meta_ga = cloudpickle.load(file)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"File {filename}.pkl not found.")
+        except Exception:
+            raise BaseException(f"File {filename}.pkl could not be loaded.")
+        return meta_ga
+
+    def plot_solutions(self, title: str, file_path: str, all_solutions: bool = False):
+        r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
+
+        Arguments:
+            title (str): Title of the plot.
+            file_path (Optional[str]): File path including filename of the file saved.
+                File extension .png included automatically.
+            all_solutions (Optional[str]): Plot evolution including all solutions.
+                If false only the best solution of each generation is plotted.
+        """
+        warnings.filterwarnings("ignore", category=UserWarning)
+        solutions = "all" if all_solutions else "best"
+        # Switch to non-interactive backend to prevent
+        # the unmodified figure from showing.
+        original_backend = plt.get_backend()
+        plt.switch_backend("agg")
+        original_fig = self.meta_ga.plot_genes(solutions=solutions, plot_type="scatter")
+        plt.switch_backend(original_backend)
+        # Improve figure and add setting labels.
+        original_fig.subplots_adjust(wspace=0.2, hspace=0.1)
+        original_fig.suptitle(title, fontsize=20)
+        for alg_name in self.gene_space:
+            for idx, setting in enumerate(self.gene_space[alg_name]):
+                original_fig.axes[idx].axes.set_xlabel("Solution", fontsize=14)
+                original_fig.axes[idx].axes.set_ylabel("Value", fontsize=14)
+                original_fig.axes[idx].axes.set_title(setting, fontsize=16)
+        original_fig.tight_layout()
+        original_fig.savefig(file_path)
+        plt.close("all")
+        # Load and display the saved image
+        img = Image.open(f"{file_path}.png")
+        plt.figure(figsize=(img.width / 100, img.height / 100), dpi=100)
+        plt.imshow(img)
+        plt.axis("off")
+        plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
+        plt.show()
+
+    def plot_fitness(self, title: str, file_path: str):
+        r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
+
+        Arguments:
+            title (Optional[str]): Title of the fitness plot.
+            file_path (Optional[str]): File path including filename of the file saved.
+                File extension .png included automatically.
+        """
+        warnings.filterwarnings("ignore", category=UserWarning)
+        self.meta_ga.plot_fitness(
+            title=title,
+            save_dir=f"{file_path}.png",
+        )
 
     def meta_ga_info(
         self,
@@ -623,8 +705,8 @@ class MetaGA:
                         <td>pop size</td>
                         <td>{self.pop_size}</td>
                     </tr>"""
-                for setting in self.gene_spaces[alg_name]:
-                    gene = ", ".join(str(value) for value in self.gene_spaces[alg_name][setting].values())
+                for setting in self.gene_space[alg_name]:
+                    gene = ", ".join(str(value) for value in self.gene_space[alg_name][setting].values())
                     combined_gene_space_len += 1
                     node_label += f"""<tr>
                         <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>

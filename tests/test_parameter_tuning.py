@@ -6,7 +6,7 @@ from niapy.problems.schwefel import Schwefel
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 
 
-GENE_SPACES = {
+GENE_SPACE = {
     "BatAlgorithm": {
         "loudness": {"low": 0.01, "high": 1.0, "step": 0.01},
         "pulse_rate": {"low": 0.01, "high": 1.0, "step": 0.01},
@@ -15,7 +15,7 @@ GENE_SPACES = {
     }
 }
 
-TARGET_GENE_SPACES = {
+TARGET_GENE_SPACE = {
     "ParticleSwarmAlgorithm": {
         "c1": {"low": 0.01, "high": 2.5, "step": 0.01},
         "c2": {"low": 0.01, "high": 2.5, "step": 0.01},
@@ -48,7 +48,7 @@ class TestParameterTuning(TestCase):
             ga_crossover_probability=0.9,
             ga_mutation_num_genes=1,
             ga_keep_elitism=1,
-            gene_spaces=GENE_SPACES,
+            gene_space=GENE_SPACE,
             pop_size=10,
             max_evals=100,
             num_runs=100,
@@ -60,9 +60,8 @@ class TestParameterTuning(TestCase):
         meta_ga_filename = "meta_ga_obj"
         meta_ga.run_meta_ga(filename=meta_ga_filename)
         archive_path = meta_ga.archive_path
-        meta_ga_save = pygad.load(os.path.join(archive_path, meta_ga_filename))
+        meta_ga_save = MetaGA.import_from_pkl(os.path.join(archive_path, meta_ga_filename))
 
         # Assert
         self.assertIsNotNone(meta_ga_save)
         self.assertTrue(any(fname.endswith(".txt") for fname in os.listdir(archive_path)))
-        self.assertTrue(any(fname.endswith(".png") for fname in os.listdir(archive_path)))
