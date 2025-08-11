@@ -604,6 +604,7 @@ class MetaheuristicsSimilarityAnalyzer:
                     figsize=(15, 3 * num_metrics),
                     fontsize=15,
                 )
+                ax.set_xlabel(xlabel="Iterations", fontdict={"fontsize": 15})
                 ax.set_title(label=metric.abbreviation(), fontdict={"fontsize": 20})
             fig.tight_layout()
         else:
@@ -620,7 +621,7 @@ class MetaheuristicsSimilarityAnalyzer:
 
             fig, axes = plt.subplots(1, 1)
             fig.suptitle(title, fontsize=23)
-            ax = df_combined_metrics.plot(ax=axes, style=style, figsize=(25, 7), logy=True, fontsize=15)
+            ax = df_combined_metrics.plot(ax=axes, style=style, figsize=(15, 5), logy=True, fontsize=15)
             ax.legend(fontsize=15)
             ax.set_xlabel(xlabel="Iterations", fontdict={"fontsize": 20})
             fig.tight_layout()
