@@ -15,7 +15,7 @@ from niapy.problems.schwefel import Schwefel
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
 
-GENE_SPACES = {
+GENE_SPACE = {
     "BatAlgorithm": {
         "loudness": {"low": 0.01, "high": 1.0, "step": 0.01},
         "pulse_rate": {"low": 0.01, "high": 1.0, "step": 0.01},
@@ -24,7 +24,7 @@ GENE_SPACES = {
     }
 }
 
-TARGET_GENE_SPACES = {
+TARGET_GENE_SPACE = {
     "ParticleSwarmAlgorithm": {
         "c1": {"low": 0.01, "high": 2.5, "step": 0.01},
         "c2": {"low": 0.01, "high": 2.5, "step": 0.01},
@@ -74,7 +74,7 @@ class TestTargetSimilarity(TestCase):
             ga_crossover_probability=0.9,
             ga_mutation_num_genes=1,
             ga_keep_elitism=1,
-            gene_space=GENE_SPACES,
+            gene_space=GENE_SPACE,
             pop_size=10,
             max_evals=100,
             num_runs=num_runs,
@@ -85,7 +85,7 @@ class TestTargetSimilarity(TestCase):
 
         analyzer = MetaheuristicsSimilarityAnalyzer(
             meta_ga=meta_ga,
-            target_gene_space=TARGET_GENE_SPACES,
+            target_gene_space=TARGET_GENE_SPACE,
             base_archive_path=self.tmp_path,
         )
 
@@ -129,7 +129,7 @@ class TestTargetSimilarity(TestCase):
             ga_crossover_probability=0.9,
             ga_mutation_num_genes=1,
             ga_keep_elitism=1,
-            gene_space=GENE_SPACES,
+            gene_space=GENE_SPACE,
             pop_size=10,
             max_evals=100,
             num_runs=num_runs,
@@ -143,7 +143,7 @@ class TestTargetSimilarity(TestCase):
         ]
         analyzer = MetaheuristicsSimilarityAnalyzer(
             meta_ga=meta_ga,
-            target_gene_space=TARGET_GENE_SPACES,
+            target_gene_space=TARGET_GENE_SPACE,
             base_archive_path=self.tmp_path,
         )
 
