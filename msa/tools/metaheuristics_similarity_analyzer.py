@@ -463,7 +463,7 @@ class MetaheuristicsSimilarityAnalyzer:
     def plot_solutions(
         self, comparison_index: int, filename: str = "meta_ga_solution_evolution", all_solutions: bool = False
     ):
-        r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
+        r"""Creates and shows a figure showing the solutions trough MetaGA generations.
 
         Args:
             comparison_index (int): Index of the comparison to create a plot for.
@@ -481,7 +481,7 @@ class MetaheuristicsSimilarityAnalyzer:
         imported_meta_ga.plot_solutions(title, file_path, all_solutions=all_solutions)
 
     def plot_fitness(self, comparison_index: int, filename: str = "meta_ga_fitness_plot"):
-        r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
+        r"""Creates and shows a figure showing the fitness trough MetaGA generations.
 
         Args:
             comparison_index (int): Index of the comparison to create a plot for.

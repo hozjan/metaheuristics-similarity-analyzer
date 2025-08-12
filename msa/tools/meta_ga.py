@@ -292,7 +292,7 @@ class MetaGA:
     def __clean_tmp_data(self):
         r"""Clean up temporary data created by the meta genetic algorithm."""
         try:
-            print("Cleaning up meta-GA temporary data...")
+            print("Cleaning up Meta-GA temporary data...")
             if os.path.exists(self.__meta_ga_tmp_data_path):
                 shutil.rmtree(self.__meta_ga_tmp_data_path)
         except Exception:
@@ -397,7 +397,7 @@ class MetaGA:
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
         Args:
-            filename (Optional[str]): Name of the .pkl file for this Meta-GA instance to be exported to.
+            filename (Optional[str]): Name of the .pkl file for this MetaGA instance to be exported to.
             log_filename (Optional[str]): Name of the generated log file.
             target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity
                 evaluation. Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
@@ -479,7 +479,7 @@ class MetaGA:
 
     def export_to_pkl(self, filename):
         """
-        Export instance of the meta-GA as .pkl.
+        Export instance of the MetaGA as .pkl.
 
         Args:
             filename (str): Filename of the output file. File extension .pkl included upon export.
@@ -493,13 +493,13 @@ class MetaGA:
     @staticmethod
     def import_from_pkl(filename) -> "MetaGA":
         """
-        Import saved instance of the meta-GA.
+        Import saved instance of the MetaGA.
 
         Args:
             filename (str): Filename of the file to import. File extension .pkl included upon import.
 
         Returns:
-            msa (MetaGA): Meta-GA instance.
+            msa (MetaGA): MetaGA instance.
 
         Raises:
             FileNotFoundError: File not found.
@@ -519,7 +519,7 @@ class MetaGA:
         return meta_ga
 
     def plot_solutions(self, title: str, file_path: str, all_solutions: bool = False):
-        r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
+        r"""Creates and shows a figure showing the solutions trough MetaGA generations.
 
         Args:
             title (str): Title of the plot.
@@ -561,7 +561,7 @@ class MetaGA:
         plt.show()
 
     def plot_fitness(self, title: str, file_path: str):
-        r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
+        r"""Creates and shows a figure showing the fitness trough MetaGA generations.
 
         Args:
             title (Optional[str]): Title of the fitness plot.
