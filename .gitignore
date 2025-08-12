@@ -55,6 +55,9 @@
 !tests/diversity_metrics_tests/util/__init__.py
 !tests/diversity_metrics_tests/util/optimization_data.py
 
+!examples
+!examples/metaheuristics_similarity_analysis.ipynb
+
 !.github
 !.github/workflows
 !.github/workflows/main.yaml
