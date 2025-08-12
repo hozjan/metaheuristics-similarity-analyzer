@@ -152,7 +152,7 @@ class MetaheuristicsSimilarityAnalyzer:
                     problem=self.meta_ga.problem,
                     base_archive_path=os.path.join(self.archive_path, "target_tuning"),
                 )
-                target_solution = meta_ga.run_meta_ga(prefix=str(idx), return_best_solution=True)
+                target_solution = meta_ga.run_meta_ga(prefix=str(idx))
                 if target_solution is not None:
                     self.target_solutions.append(target_solution)
             else:
@@ -365,7 +365,8 @@ class MetaheuristicsSimilarityAnalyzer:
                 gene_space=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
-            logger_headline = f"\n======> {comparison_idx}/{len(self.target_solutions)-1}_COMPARISON_{self.target_alg_abbr}-{self.optimized_alg_abbr} <======"
+            logger_headline = f"\n======> {comparison_idx}/{len(self.target_solutions)-1}"
+            logger_headline += f"_COMPARISON_{self.target_alg_abbr}-{self.optimized_alg_abbr} <======"
             logger_headline += f"\n|-> {self.target_alg_abbr} target = {target_solution}"
 
             self.meta_ga.run_meta_ga(
@@ -419,6 +420,7 @@ class MetaheuristicsSimilarityAnalyzer:
         Raises:
             FileNotFoundError: File not found.
             BaseException: File could not be loaded.
+            TypeError: Imported object is not a `MetaheuristicsSimilarityAnalyzer` instance.
         """
 
         try:
@@ -429,12 +431,14 @@ class MetaheuristicsSimilarityAnalyzer:
         except Exception:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
         msa.__absolute_dirname = os.path.join(os.getcwd(), os.path.dirname(filename))
+        if not isinstance(msa, MetaheuristicsSimilarityAnalyzer):
+            raise TypeError("Provided .pkl file is not a `MetaheuristicsSimilarityAnalyzer` export.")
         return msa
 
     def __import_comparison_meta_ga(self, comparison_index: int):
         r"""Imports MetaGA object of the selected comparison.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
 
         Returns:
@@ -461,7 +465,7 @@ class MetaheuristicsSimilarityAnalyzer:
     ):
         r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
             filename (Optional[str]): Filename of the .png file saved.
                 File is saved under the corresponding comparisons directory.
@@ -479,7 +483,7 @@ class MetaheuristicsSimilarityAnalyzer:
     def plot_fitness(self, comparison_index: int, filename: str = "meta_ga_fitness_plot"):
         r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
             filename (Optional[str]): Filename of the .png file saved.
                 File is saved under the corresponding comparisons directory.
@@ -495,7 +499,7 @@ class MetaheuristicsSimilarityAnalyzer:
     def indiv_diversity_metrics_comparison(self, comparison_index: int, run_index: int):
         r"""Creates and shows a figure showing the individual diversity metrics of both metaheuristics.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
             run_index (Optional[str]): Index of the optimization run to plot the metrics for.
 
@@ -528,7 +532,7 @@ class MetaheuristicsSimilarityAnalyzer:
         fig, axes = plt.subplots(lines, plots_per_line)
         title = f"{comparison_index} comparison run {run_index} individual diversity metrics"
         fig.suptitle(title, fontsize=23)
-        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.tight_layout(rect=(0, 0.03, 1, 0.95))
         fig.subplots_adjust(wspace=0.4, hspace=0.4)
 
         for idx, metric in enumerate(self.meta_ga.indiv_diversity_metrics):
@@ -554,7 +558,7 @@ class MetaheuristicsSimilarityAnalyzer:
     ):
         r"""Creates and shows a figure showing the population diversity metrics of both metaheuristics.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
             run_index (Optional[str]): Index of the optimization run to plot the metrics for.
             separate (Optional[bool]): Show diversity metrics on separate axes for better resolution.
@@ -830,7 +834,7 @@ class MetaheuristicsSimilarityAnalyzer:
         r"""Generate latex file containing MSA results in form of tables.
         Optionally also generate pdf file.
 
-        Arguments:
+        Args:
             filename (Optional[str]): Filename without extensions used for the .tex and .pdf files.
                 Composed if not provided.
             generate_pdf (Optional[bool]): Generates a .pdf file. Only .tex file is generated if false.

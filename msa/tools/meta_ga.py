@@ -1,4 +1,6 @@
 import numpy.typing as npt
+from typing import Optional
+from collections.abc import Callable
 from niapy.problems import Problem
 from niapy.algorithms import Algorithm
 from datetime import datetime
@@ -56,8 +58,8 @@ class MetaGA:
         max_iters: int | float = np.inf,
         max_evals: int | float = np.inf,
         num_runs: int = 10,
-        pop_diversity_metrics: list[PopDiversityMetric] | None = None,
-        indiv_diversity_metrics: list[IndivDiversityMetric] | None = None,
+        pop_diversity_metrics: list[PopDiversityMetric] = [],
+        indiv_diversity_metrics: list[IndivDiversityMetric] = [],
         rng_seed: int | None = None,
         base_archive_path="archive",
     ):
@@ -101,7 +103,7 @@ class MetaGA:
         """
 
         if fitness_function_type is MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY and (
-            pop_diversity_metrics is None or indiv_diversity_metrics is None
+            len(pop_diversity_metrics) == 0 or len(indiv_diversity_metrics) == 0
         ):
             raise ValueError(
                 "Diversity metrics must be defined when fitness_function_type set to `PERFORMANCE_SIMILARITY`."
@@ -112,9 +114,6 @@ class MetaGA:
 
         if len(gene_space) != 1:
             raise ValueError("Only one algorithm must be defined in the `gene_space` provided.")
-
-        if not isinstance(problem, Problem):
-            raise TypeError(f"Provided problem type `{type(problem).__name__}` is not compatible.")
 
         self.fitness_function_type = fitness_function_type
         self.gene_space = gene_space
@@ -138,14 +137,14 @@ class MetaGA:
         self.rng_seed = rng_seed
         self.base_archive_path = base_archive_path
 
-        self.meta_ga: pygad.GA | None = None
+        self.meta_ga: Optional[pygad.GA] = None
         self.combined_gene_space: list[dict[str, float]] = []
         self.low_ranges: list[float] = []
         self.high_ranges: list[float] = []
         self.random_mutation_min_val: list[float] = []
         self.random_mutation_max_val: list[float] = []
         self.archive_path = ""
-        self.__fitness_function = None
+        self.__fitness_function: Optional[Callable] = None
         self.__optimized_algorithm = Algorithm()
         self.__target_algorithm = Algorithm()
         self.__meta_dataset = "meta_dataset"
@@ -400,8 +399,8 @@ class MetaGA:
         Args:
             filename (Optional[str]): Name of the .pkl file for this Meta-GA instance to be exported to.
             log_filename (Optional[str]): Name of the generated log file.
-            target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity evaluation.
-                Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
+            target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity
+                evaluation. Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
             prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current
                 datetime by default.
@@ -410,7 +409,7 @@ class MetaGA:
             log_headline (Optional[str]): First line to be written to the log.
 
         Returns:
-            best_solution (numpy.ndarray[float]): Returns best solution.
+            best_solution (numpy.ndarray[float]): Best solution.
 
         Raises:
             ValueError: `target_algorithm` was not provided when required.
@@ -505,6 +504,7 @@ class MetaGA:
         Raises:
             FileNotFoundError: File not found.
             BaseException: File could not be loaded.
+            TypeError: Imported object is not a `MetaGA` instance.
         """
 
         try:
@@ -514,18 +514,25 @@ class MetaGA:
             raise FileNotFoundError(f"File {filename}.pkl not found.")
         except Exception:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
+        if not isinstance(meta_ga, MetaGA):
+            raise TypeError("Provided .pkl file is not a `MetaGA` export.")
         return meta_ga
 
     def plot_solutions(self, title: str, file_path: str, all_solutions: bool = False):
         r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
 
-        Arguments:
+        Args:
             title (str): Title of the plot.
             file_path (Optional[str]): File path including filename of the file saved.
                 File extension .png included automatically.
             all_solutions (Optional[str]): Plot evolution including all solutions.
                 If false only the best solution of each generation is plotted.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
         """
+        if self.meta_ga is None:
+            raise ValueError("`run_meta_ga` has not been called yet. No data to plot.")
         warnings.filterwarnings("ignore", category=UserWarning)
         solutions = "all" if all_solutions else "best"
         # Switch to non-interactive backend to prevent
@@ -556,11 +563,16 @@ class MetaGA:
     def plot_fitness(self, title: str, file_path: str):
         r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
 
-        Arguments:
+        Args:
             title (Optional[str]): Title of the fitness plot.
             file_path (Optional[str]): File path including filename of the file saved.
                 File extension .png included automatically.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
         """
+        if self.meta_ga is None:
+            raise ValueError("`run_meta_ga` has not been called yet. No data to plot.")
         warnings.filterwarnings("ignore", category=UserWarning)
         self.meta_ga.plot_fitness(
             title=title,
@@ -679,7 +691,7 @@ class MetaGA:
                         <td>pop size</td>
                         <td>{self.pop_size}</td>
                     </tr></table>>"""
-                    cc.node(name=f"target_gene_space", label=node_label)
+                    cc.node(name="target_gene_space", label=node_label)
 
             with c.subgraph(name="cluster_00") as cc:
                 cc.attr(
@@ -712,7 +724,7 @@ class MetaGA:
                         <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
                     </tr>"""
                 node_label += "</table>>"
-                cc.node(name=f"gene_space", label=node_label)
+                cc.node(name="gene_space", label=node_label)
 
                 combined_gene_string = f"""<
                 <table border="0" cellborder="1" cellspacing="0">
@@ -728,7 +740,7 @@ class MetaGA:
                     </tr>
                 </table>>"""
                 cc.node(name="combined_gene_space", label=combined_gene_string)
-                cc.edge(f"gene_space", "combined_gene_space")
+                cc.edge("gene_space", "combined_gene_space")
 
         with gv.subgraph(name="cluster_1") as c:
             c.attr(
