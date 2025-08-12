@@ -147,13 +147,13 @@ class PopulationData:
 
     def get_population_or_empty(self):
         if self.population is None:
-            return np.array()
+            return np.array([])
         else:
             return self.population
 
     def get_population_fitness_or_empty(self):
         if self.population_fitness is None:
-            return np.array()
+            return np.array([])
         else:
             return self.population_fitness
 
