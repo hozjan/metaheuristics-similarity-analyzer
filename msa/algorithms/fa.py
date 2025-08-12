@@ -175,6 +175,7 @@ class FireflyAlgorithm(Algorithm):
                 4. New global best solutions fitness/objective value
                 5. Additional arguments:
                     * alpha (float): Randomness strength.
+                    * sorted_idx (list[int]): Result of the argsort used to sort the population
 
         See Also:
             * :func:`niapy.algorithms.basic.FireflyAlgorithm.move_ffa`

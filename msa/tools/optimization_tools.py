@@ -2,6 +2,7 @@ import multiprocessing
 import threading
 
 from niapy.algorithms import Algorithm
+from niapy.algorithms.algorithm import Individual
 from niapy.problems import Problem
 from niapy.task import Task
 import os
@@ -60,9 +61,11 @@ def optimization(
         sorted_idx = order_idx.copy()
 
         while not task.stopping_condition():
-            # save population data
+            # Save population data
+            ordered_pop = pop[sorted_idx]
+            population = np.array([x.x for x in ordered_pop]) if isinstance(pop[0], Individual) else ordered_pop
             pop_data = PopulationData(
-                population=np.array(pop[sorted_idx]),
+                population=population,
                 population_fitness=np.array(fpop[sorted_idx]),
                 best_solution=np.array(xb),
                 best_fitness=fxb * task.optimization_type.value,

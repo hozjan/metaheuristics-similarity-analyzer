@@ -10,6 +10,7 @@ from json import JSONEncoder
 from niapy.problems import Problem
 from sklearn.decomposition import PCA
 import math
+import inspect
 from msa.util.helper import smape
 
 __all__ = ["IndivDiversityMetric", "PopDiversityMetric", "PopulationData", "SingleRunData", "JsonEncoder"]
@@ -429,7 +430,7 @@ class SingleRunData:
 
         if self.algorithm_parameters is not None:
             for k, v in self.algorithm_parameters.items():
-                if isinstance(v, FunctionType):
+                if isinstance(v, FunctionType) or inspect.isclass(v):
                     self.algorithm_parameters[k] = v.__name__
 
         json_object = json.dumps(self.__dict__, indent=4, cls=JsonEncoder)
