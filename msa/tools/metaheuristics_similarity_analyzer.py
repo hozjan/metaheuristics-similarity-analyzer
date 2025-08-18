@@ -1270,7 +1270,7 @@ class MetaheuristicsSimilarityAnalyzer:
                     </tr>
                     <tr>
                         <td>rng seed</td>
-                        <td>{self.meta_ga.rng_seed}</td>
+                        <td>run index</td>
                     </tr>
                 </table>>"""
 

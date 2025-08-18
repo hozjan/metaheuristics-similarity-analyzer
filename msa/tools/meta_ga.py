@@ -60,7 +60,6 @@ class MetaGA:
         num_runs: int = 10,
         pop_diversity_metrics: list[PopDiversityMetric] = [],
         indiv_diversity_metrics: list[IndivDiversityMetric] = [],
-        rng_seed: int | None = None,
         base_archive_path="archive",
     ):
         r"""Initialize meta genetic algorithm.
@@ -92,8 +91,6 @@ class MetaGA:
                 Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics
                 calculated. Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
-            rng_seed (Optional[int]): Seed of the random generator. Provide for reproducible results. Only has effect
-                when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             base_archive_path (Optional[str]): Base archive path of the meta genetic algorithm.
 
             ValueError: No diversity metrics defined when required.
@@ -134,7 +131,6 @@ class MetaGA:
         self.num_runs = num_runs
         self.pop_diversity_metrics = pop_diversity_metrics
         self.indiv_diversity_metrics = indiv_diversity_metrics
-        self.rng_seed = rng_seed
         self.base_archive_path = base_archive_path
 
         self.meta_ga: Optional[pygad.GA] = None
@@ -245,7 +241,7 @@ class MetaGA:
         solution: list[float] | npt.NDArray,
         gene_space: dict[str | Algorithm, dict[str, dict[str, float]]],
         pop_size: int,
-    ):
+    ) -> Algorithm:
         r"""Apply meta genetic algorithm solution to an corresponding algorithm based on
         the gene space used for the meta optimization. Make sure the solution matches the gene space.
 
@@ -663,7 +659,7 @@ class MetaGA:
                     </tr>
                     <tr>
                         <td>rng seed</td>
-                        <td>{self.rng_seed}</td>
+                        <td>run index</td>
                     </tr>
                 </table>>"""
             c.node(name="meta_ga_parameters", label=meta_ga_parameters_label)
@@ -708,7 +704,6 @@ class MetaGA:
                     margin="0",
                 )
                 combined_gene_space_len = 0
-                alg_name = self.__optimized_algorithm.__class__.__name__
                 node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
                     <tr>
                         <td colspan="2"><b>{self.__optimized_algorithm.Name[1]}</b></td>
@@ -717,12 +712,13 @@ class MetaGA:
                         <td>pop size</td>
                         <td>{self.pop_size}</td>
                     </tr>"""
-                for setting in self.gene_space[alg_name]:
-                    gene = ", ".join(str(value) for value in self.gene_space[alg_name][setting].values())
-                    combined_gene_space_len += 1
-                    node_label += f"""<tr>
-                        <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
-                    </tr>"""
+                for alg_name in self.gene_space:
+                    for setting in self.gene_space[alg_name]:
+                        gene = ", ".join(str(value) for value in self.gene_space[alg_name][setting].values())
+                        combined_gene_space_len += 1
+                        node_label += f"""<tr>
+                            <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
+                        </tr>"""
                 node_label += "</table>>"
                 cc.node(name="gene_space", label=node_label)
 
