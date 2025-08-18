@@ -99,6 +99,7 @@ After the analysis we can choose to export results of the analysis as a .pdf and
 ```python
 msa.export_results_to_latex(generate_pdf=True)
 ```
+For more information check out [examples](/examples).
 
 ## This project depends on
 ### [NiaPy](https://github.com/NiaOrg/NiaPy?tab=readme-ov-file) Python microframework

@@ -57,6 +57,7 @@
 
 !examples
 !examples/metaheuristics_similarity_analysis.ipynb
+!examples/metaheuristics_parameter_tuning.ipynb
 
 !.github
 !.github/workflows
