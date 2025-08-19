@@ -84,18 +84,19 @@ class PopDiversityMetric(ABC):
 
 
 class PopulationData:
-    r"""Class for archiving population data. Contains population, diversity
-    metrics etc.
+    r"""Class for the archiving of the population data. Contains the values
+    of the individuals vectors of the population, population diversity metrics
+    values etc.
 
     Attributes:
-        population (Optional[numpy.ndarray]): Population.
-            population_fitness (Optional[numpy.ndarray]): Population fitness.
-            best_solution (Optional[numpy.ndarray]): Best solution in the
-                population.
-            best_fitness (Optional[float]): Fitness of the best solution in
-                the population.
-            metrics_values (Dict[str, np.ndarray]): Dictionary of population
-                diversity metrics values.
+        population (Optional[numpy.ndarray]): Array of individuals vectors.
+        population_fitness (Optional[numpy.ndarray]): Population fitness.
+        best_solution (Optional[numpy.ndarray]): Best solution in the
+            population.
+        best_fitness (Optional[float]): Fitness of the best solution in
+            the population.
+        metrics_values (Dict[str, np.ndarray]): Dictionary of population
+            diversity metrics values.
     """
 
     def __init__(
@@ -108,7 +109,7 @@ class PopulationData:
         r"""Archive the population data and calculate diversity metrics.
 
         Args:
-            population (Optional[numpy.ndarray]): Population.
+            population (Optional[numpy.ndarray]): Array of individuals vectors.
             population_fitness (Optional[numpy.ndarray]): Population fitness.
             best_solution (Optional[numpy.ndarray]): Best solution in the
                 population.
@@ -159,9 +160,9 @@ class PopulationData:
 
 
 class SingleRunData:
-    r"""Class for archiving optimization run data.
+    r"""Class used for the archiving of the optimization run data.
     Contains list of population data through iterations, run details such as
-    problem used, algorithm used etc.
+    problem used, algorithm used, diversity metrics values etc.
 
     Attributes:
         algorithm_name (Optional[str]): Algorithm name.
@@ -170,8 +171,8 @@ class SingleRunData:
         problem_name (Optional[str]): Problem name.
         max_evals (Optional[int]): Maximum number of function evaluations.
         max_iters (Optional[int]): Maximum number of generations or iterations.
-        rng_seed (Optional[int]): Seed of the random generator used for
-            optimization.
+        rng_seed (Optional[int]): Seed of the random generator used for the
+            initialization of the population.
         evals (int): number of evaluations used.
         populations (List[PopulationData]): list of populations recorded
             during the solving of the problem.

@@ -104,8 +104,9 @@ class TestTargetSimilarity(TestCase):
 
         # Assert
         dataset_path = os.path.join(imported_analyzer.dataset_path, "0_comparison")
-        first_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.target_alg_abbr)
-        second_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.optimized_alg_abbr)
+        algorithms_abbreviations = os.listdir(dataset_path)
+        first_runs = get_sorted_list_of_runs(dataset_path, algorithms_abbreviations[0])
+        second_runs = get_sorted_list_of_runs(dataset_path, algorithms_abbreviations[1])
         self.assertEquals(len(first_runs), num_runs)
         self.assertEquals(len(second_runs), num_runs)
         self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))
@@ -162,8 +163,9 @@ class TestTargetSimilarity(TestCase):
 
         # Assert
         dataset_path = os.path.join(imported_analyzer.dataset_path, "0_comparison")
-        first_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.target_alg_abbr)
-        second_runs = get_sorted_list_of_runs(dataset_path, imported_analyzer.optimized_alg_abbr)
+        algorithms_abbreviations = os.listdir(dataset_path)
+        first_runs = get_sorted_list_of_runs(dataset_path, algorithms_abbreviations[0])
+        second_runs = get_sorted_list_of_runs(dataset_path, algorithms_abbreviations[1])
         self.assertEquals(len(first_runs), num_runs)
         self.assertEquals(len(second_runs), num_runs)
         self.assertTrue(any(fname.endswith(".pdf") for fname in os.listdir(archive_path)))

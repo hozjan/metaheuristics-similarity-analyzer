@@ -35,9 +35,46 @@ __all__ = ["MetaGA"]
 
 
 class MetaGA:
-    r"""Class containing metadata of meta genetic algorithm."""
+    r"""Class using `pygad` `GA` class creating a meta genetic algorithm equipped with fitness
+    functions to perform similarity analysis and parameter tuning of the metaheuristics.
 
-    # TODO add attributes
+    Attributes:
+        fitness_function_type (MetaGAFitnessFunction): Type of fitness function of meta genetic algorithm.
+        ga_generations (int): Number of generations of the genetic algorithm.
+        ga_solutions_per_pop (int): Number of solutions per generation of the genetic algorithm.
+        ga_percent_parents_mating (int): Percentage of parents mating for production of the offspring of the
+            genetic algorithm [1, 100].
+        ga_parent_selection_type (str): Type of parent selection of the genetic algorithm.
+        ga_k_tournament (int): Number of parents participating in the tournament selection of the genetic
+            algorithm. Only has effect when ga_parent_selection_type equals 'tournament'.
+        ga_crossover_type (str): Crossover type of the genetic algorithm.
+        ga_mutation_type (str): Mutation type of the genetic algorithm.
+        ga_crossover_probability (float): Crossover probability of the genetic algorithm [0,1].
+        ga_mutation_num_genes (int): Number of genes mutated in the solution of the genetic algorithm.
+        ga_keep_elitism (int): Number of solutions that are a part of the elitism of the genetic algorithm.
+        gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene space of the solution.
+        pop_size (int): Population size of the metaheuristics being optimized.
+        problem (Problem): Optimization problem used for optimization.
+        max_iters (int | float): Maximum number of iterations of the metaheuristic being optimized for
+            each solution of the genetic algorithm.
+        max_evals (int | float): Maximum number of evaluations of the metaheuristic being optimized for
+            each solution of the genetic algorithm.
+        num_runs (int): Number of runs performed by the metaheuristic being optimized for each solution
+            of the genetic algorithm.
+        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics calculated.
+            Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
+        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics
+            calculated. Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
+        base_archive_path (str): Base archive path of the MetaGA.
+        archive_path (str): Archive path including `base_archive_path` followed by /`prefix`_`suffix`.
+            Generated when calling `run_meta_ga`.
+        meta_ga (GA): Instance of the `pygad` `GA` class used for meta-optimization.
+        combined_gene_space (list[dict[str, float]]): combined list of all attribute ranges/settings in `gene_space`.
+        low_ranges (list[float]): List of minimum values of each `gene_space` attribute range.
+        high_ranges (list[float]): List of maximum values of each `gene_space` attribute range.
+        random_mutation_min_val (list[float]): List of Lowest values by which each gene can change.
+        random_mutation_max_val (list[float]): List of Highest values by which each gene can change.
+    """
 
     def __init__(
         self,
@@ -93,6 +130,7 @@ class MetaGA:
                 calculated. Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             base_archive_path (Optional[str]): Base archive path of the meta genetic algorithm.
 
+        Raises:
             ValueError: No diversity metrics defined when required.
             ValueError: Neither of `max_evals` or `max_iters` was assigned a finite value.
             ValueError: Incorrect number of algorithms defined in the provided `gene_space`.
@@ -583,7 +621,7 @@ class MetaGA:
         graph_color: str = "grey",
         sub_graph_color: str = "lightgrey",
     ):
-        r"""Produces a scheme of meta genetic algorithm configuration.
+        r"""Produces a scheme of the MetaGA configuration.
 
         Args:
             filename (Optional[str]): Name of the scheme image file.
