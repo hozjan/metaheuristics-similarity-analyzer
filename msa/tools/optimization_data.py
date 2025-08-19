@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 from types import FunctionType
+import warnings
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -26,8 +27,7 @@ class JsonEncoder(JSONEncoder):
 
 
 class IndivDiversityMetric(ABC):
-    r"""Class representing a individual diversity metric.
-    """
+    r"""Class representing a individual diversity metric."""
 
     def __init__(self, *args, **kwargs):
         r"""Initialize individual diversity metric."""
@@ -55,8 +55,7 @@ class IndivDiversityMetric(ABC):
 
 
 class PopDiversityMetric(ABC):
-    r"""Class representing a population diversity metric.
-    """
+    r"""Class representing a population diversity metric."""
 
     def __init__(self, *args, **kwargs):
         r"""Initialize population diversity metric."""
@@ -364,6 +363,9 @@ class SingleRunData:
         Returns:
             similarity (float | numpy.ndarray[float]): mean 1-SMAPE value or array of 1-SMAPE
                 values if get_raw_values is true.
+
+        Raises:
+            Warning: Mismatch in population diversity metrics length
         """
         first_im = self.get_indiv_diversity_metrics_values().to_numpy().transpose()
         first_pm = self.get_pop_diversity_metrics_values().to_numpy().transpose()
@@ -371,8 +373,20 @@ class SingleRunData:
         second_im = second.get_indiv_diversity_metrics_values().to_numpy().transpose()
         second_pm = second.get_pop_diversity_metrics_values().to_numpy().transpose()
 
+        if first_pm.shape != second_pm.shape:
+            warnings.warn(
+                f"""\nMismatch in the length of the population diversity metrics arrays during similarity calculation,
+                {first_pm.shape[1]} != {second_pm.shape[1]}. This is most likely due to algorithms completing different
+                number of generations under common `max_evals` limit. Shorter of both diversity metrics arrays will be
+                padded with zeros!""",
+                Warning,
+            )
         smape_values = []
         for fpm, spm in zip(first_pm, second_pm):
+            if len(fpm) < len(spm):
+                fpm = np.pad(fpm, (0, len(spm) - len(fpm)), "constant", constant_values=(0, 0))
+            elif len(spm) < len(fpm):
+                spm = np.pad(spm, (0, len(fpm) - len(spm)), "constant", constant_values=(0, 0))
             smape_values.append(smape(fpm, spm))
 
         for fim, sim in zip(first_im, second_im):
