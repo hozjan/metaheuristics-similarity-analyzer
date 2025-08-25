@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Tuple
 import warnings
 import os
 import time
@@ -33,20 +34,35 @@ __all__ = ["MetaheuristicsSimilarityAnalyzer", "SimilarityMetrics"]
 
 class SimilarityMetrics(Enum):
     SMAPE = "smape"
-    COS = "cosine"
-    SPEARMAN = "spearman_r"
-    KNN = "knn_test"
-    SVM = "svm_test"
+    COS = "cos"
+    SPEARMAN = "spearman"
+    KNN = "knn"
+    SVM = "svm"
 
 
 class MetaheuristicsSimilarityAnalyzer:
-    r"""Class for search and analysis of similarity of metaheuristics with
-    different parameter settings. Uses target metaheuristic with stochastically
-    selected parameters and aims to find parameters of the optimized
-    metaheuristic with which they perform in a similar manner.
-    """
+    r"""Class for the analysis of the similarity of metaheuristics with
+    different parameter settings. Uses target/reference metaheuristic with
+    either randomly or by parameter tuning selected parameters and aims to
+    find parameters of the optimized metaheuristic with which they perform
+    in a similar manner.
 
-    # TODO add attributes
+    Attributes:
+        meta_ga (MetaGA): Pre-configured instance of the MetaGA with fitness function set to
+            `TARGET_PERFORMANCE_SIMILARITY`.
+        target_gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]):
+            Gene space of the target/reference metaheuristic.
+        base_archive_path (str): Base archive path of the MSA. Used for dataset location.
+        archive_path (str): Archive path of the MSA including `base_archive_path` followed by /`prefix`_.
+            Generated when calling `run_similarity_analysis`.
+        dataset_path (str): Path of the generated dataset including `archive_path`.
+        target_solutions (list[np.ndarray]): List of target solutions used for the target (reference)
+            algorithm during the analysis
+        optimized_solutions (list[np.ndarray]): List of optimized solutions of the optimized algorithm
+            acquired during the similarity analysis.
+        similarity_metrics (dict[str, list[float]]): Dictionary of values of the calculated similarity
+            metrics.
+    """
 
     def __init__(
         self,
@@ -57,11 +73,10 @@ class MetaheuristicsSimilarityAnalyzer:
         r"""Initialize the metaheuristic similarity analyzer.
 
         Args:
-            meta_ga (Optional[MetaGA]): Pre-configured instance of the meta
-                genetic algorithm with fitness function set to
+            meta_ga (MetaGA): Pre-configured instance of the MetaGA with fitness function set to
                 `TARGET_PERFORMANCE_SIMILARITY`.
             target_gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]):
-                Gene space of the reference metaheuristic.
+                Gene space of the target/reference metaheuristic.
             base_archive_path (Optional[str]): Base archive path of the MSA. Used for dataset location.
 
         Raises:
@@ -88,9 +103,9 @@ class MetaheuristicsSimilarityAnalyzer:
         self.similarity_metrics: dict[str, list[float]] = {}
         self.archive_path = ""
         self.dataset_path = ""
-        self.target_alg_abbr = get_algorithm_by_name(list(target_gene_space)[0]).Name[1]
-        self.optimized_alg_abbr = get_algorithm_by_name(list(self.meta_ga.gene_space)[0]).Name[1]
-        self._base_archive_path = base_archive_path
+        self.base_archive_path = base_archive_path
+        self.__target_alg_abbr = get_algorithm_by_name(list(target_gene_space)[0]).Name[1]
+        self.__optimized_alg_abbr = get_algorithm_by_name(list(self.meta_ga.gene_space)[0]).Name[1]
         self.__meta_ga_pkl_filename = "meta_ga_export"
         self.__comparison_dir_suffix = "comparison"
         self.__dataset_dirname = "dataset"
@@ -152,7 +167,7 @@ class MetaheuristicsSimilarityAnalyzer:
                     problem=self.meta_ga.problem,
                     base_archive_path=os.path.join(self.archive_path, "target_tuning"),
                 )
-                target_solution = meta_ga.run_meta_ga(prefix=str(idx), return_best_solution=True)
+                target_solution = meta_ga.run_meta_ga(prefix=str(idx))
                 if target_solution is not None:
                     self.target_solutions.append(target_solution)
             else:
@@ -177,8 +192,8 @@ class MetaheuristicsSimilarityAnalyzer:
 
         comparisons = os.listdir(self.dataset_path)
 
-        mean_smape = []
-        cosine_similarity = []
+        sim_smape = []
+        sim_cos = []
         spearman_r = []
 
         for idx in range(len(comparisons)):
@@ -186,8 +201,10 @@ class MetaheuristicsSimilarityAnalyzer:
             feature_vectors_1 = []
             feature_vectors_2 = []
 
-            first_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.target_alg_abbr)
-            second_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.optimized_alg_abbr)
+            first_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.__target_alg_abbr)
+            second_runs = get_sorted_list_of_runs(
+                os.path.join(self.dataset_path, comparison), self.__optimized_alg_abbr
+            )
 
             smape_values = []
             for first_run, second_run in zip(first_runs, second_runs):
@@ -203,21 +220,21 @@ class MetaheuristicsSimilarityAnalyzer:
                 # calculate 1-SMAPE metric
                 smape_values.append(f_srd.get_diversity_metrics_similarity(s_srd))
 
-            mean_smape.append(round(np.mean(smape_values), 2))
+            sim_smape.append(round(np.mean(smape_values), 2))
 
             fv1_mean = np.mean(feature_vectors_1, axis=0)
             fv2_mean = np.mean(feature_vectors_2, axis=0)
 
             # calculate cosine similarity and spearman correlation coefficients
-            cosine_similarity.append(1 - spatial.distance.cosine(fv1_mean, fv2_mean))
+            sim_cos.append(1 - spatial.distance.cosine(fv1_mean, fv2_mean))
             r, p = stats.spearmanr(fv1_mean, fv2_mean)
             spearman_r.append(r)
 
         # get knn and svm 1-accuracy metric
         ml_accuracy = self.svm_and_knn_classification_similarity_metrics(100)
 
-        self.similarity_metrics[SimilarityMetrics.SMAPE.value] = mean_smape
-        self.similarity_metrics[SimilarityMetrics.COS.value] = cosine_similarity
+        self.similarity_metrics[SimilarityMetrics.SMAPE.value] = sim_smape
+        self.similarity_metrics[SimilarityMetrics.COS.value] = sim_cos
         self.similarity_metrics[SimilarityMetrics.SPEARMAN.value] = spearman_r
         self.similarity_metrics.update(ml_accuracy)
 
@@ -273,11 +290,11 @@ class MetaheuristicsSimilarityAnalyzer:
         if prefix is None:
             prefix = str(datetime.now().strftime("%m-%d_%H.%M.%S"))
         self.archive_path = os.path.join(
-            self._base_archive_path,
+            self.base_archive_path,
             "_".join(
                 [
                     prefix,
-                    f"{self.target_alg_abbr}-{self.optimized_alg_abbr}",
+                    f"{self.__target_alg_abbr}-{self.__optimized_alg_abbr}",
                     self.meta_ga.problem.name(),
                 ]
             ),
@@ -306,7 +323,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 combinations to analyze during the similarity analysis.
                 Required if `target_solutions` is None.
             target_solutions (Optional[list[numpy.ndarray]]): Target solutions
-                for the target algorithm. Generated if None.
+                used for the target algorithm. Generated if None.
             generate_optimized_targets (Optional[bool]): Generate target
                 solutions by parameter tuning. Target solutions wil be
                 generated by uniform rng if false. Has no effect if
@@ -365,15 +382,17 @@ class MetaheuristicsSimilarityAnalyzer:
                 gene_space=self.target_gene_space,
                 pop_size=self.meta_ga.pop_size,
             )
-            logger_headline = f"\n======> {comparison_idx}/{len(self.target_solutions)-1}_COMPARISON_{self.target_alg_abbr}-{self.optimized_alg_abbr} <======"
-            logger_headline += f"\n|-> {self.target_alg_abbr} target = {target_solution}"
+            logger_headline = f"\n======> {comparison_idx}/{len(self.target_solutions)-1}"
+            logger_headline += f"_COMPARISON_{self.__target_alg_abbr}-{self.__optimized_alg_abbr} <======"
+            logger_headline += f"\n|-> {self.__target_alg_abbr} target = {target_solution}"
 
             self.meta_ga.run_meta_ga(
-                filename=self.__meta_ga_pkl_filename,
                 target_algorithm=target_algorithm,
                 prefix=str(comparison_idx),
                 suffix=self.__comparison_dir_suffix,
                 log_headline=logger_headline,
+                export=True,
+                pkl_filename=self.__meta_ga_pkl_filename,
             )
             if self.meta_ga.meta_ga is not None:
                 self.optimized_solutions.append(self.meta_ga.meta_ga.best_solutions[-1])
@@ -419,6 +438,7 @@ class MetaheuristicsSimilarityAnalyzer:
         Raises:
             FileNotFoundError: File not found.
             BaseException: File could not be loaded.
+            TypeError: Imported object is not a `MetaheuristicsSimilarityAnalyzer` instance.
         """
 
         try:
@@ -429,12 +449,14 @@ class MetaheuristicsSimilarityAnalyzer:
         except Exception:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
         msa.__absolute_dirname = os.path.join(os.getcwd(), os.path.dirname(filename))
+        if not isinstance(msa, MetaheuristicsSimilarityAnalyzer):
+            raise TypeError("Provided .pkl file is not a `MetaheuristicsSimilarityAnalyzer` export.")
         return msa
 
-    def __import_comparison_meta_ga(self, comparison_index: int):
+    def __import_comparison_meta_ga(self, comparison_index: int) -> Tuple[str, MetaGA]:
         r"""Imports MetaGA object of the selected comparison.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
 
         Returns:
@@ -459,45 +481,50 @@ class MetaheuristicsSimilarityAnalyzer:
     def plot_solutions(
         self, comparison_index: int, filename: str = "meta_ga_solution_evolution", all_solutions: bool = False
     ):
-        r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
+        r"""Creates and shows a figure showing the solutions trough MetaGA generations.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
             filename (Optional[str]): Filename of the .png file saved.
                 File is saved under the corresponding comparisons directory.
-            all_solutions (Optional[str]): Plot evolution including all solutions.
+                File extension .png included automatically.
+            all_solutions (Optional[bool]): Plot evolution including all solutions.
                 If false only the best solutions of each generation are plotted.
 
         Raises:
             ValueError: `comparison_index` out of range.
         """
         comparison_path, imported_meta_ga = self.__import_comparison_meta_ga(comparison_index)
-        title = f"{comparison_index} comparison solutions"
+        solutions = "all" if all_solutions else "best"
+        title = f"Comparison {comparison_index} {self.__target_alg_abbr}-{self.__optimized_alg_abbr}"
+        title += f" Meta-GA {solutions} solutions"
         file_path = os.path.join(comparison_path, filename)
-        imported_meta_ga.plot_solutions(title, file_path, all_solutions=all_solutions)
+        imported_meta_ga._plot_solutions(title=title, file_path=file_path, all_solutions=all_solutions)
 
     def plot_fitness(self, comparison_index: int, filename: str = "meta_ga_fitness_plot"):
-        r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
+        r"""Creates and shows a figure showing the fitness trough MetaGA generations.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
             filename (Optional[str]): Filename of the .png file saved.
                 File is saved under the corresponding comparisons directory.
+                File extension .png included automatically.
 
         Raises:
             ValueError: `comparison_index` out of range.
         """
         comparison_path, imported_meta_ga = self.__import_comparison_meta_ga(comparison_index)
         file_path = os.path.join(comparison_path, filename)
-        title = f"{comparison_index} comparison {self.target_alg_abbr}-{self.optimized_alg_abbr} Meta-GA Fitness"
-        imported_meta_ga.plot_fitness(title, file_path)
+        title = f"Comparison {comparison_index} {self.__target_alg_abbr}-{self.__optimized_alg_abbr} Meta-GA fitness"
+        imported_meta_ga._plot_fitness(title=title, file_path=file_path)
 
-    def indiv_diversity_metrics_comparison(self, comparison_index: int, run_index: int):
+    def indiv_diversity_metrics_comparison(self, comparison_index: int, run_index: int, title: str | None = None):
         r"""Creates and shows a figure showing the individual diversity metrics of both metaheuristics.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
-            run_index (Optional[str]): Index of the optimization run to plot the metrics for.
+            run_index (int): Index of the optimization run to plot the metrics for.
+            title (Optional[str]): Title of the plot.
 
         Raises:
             ValueError: `comparison_index` out of range.
@@ -512,8 +539,8 @@ class MetaheuristicsSimilarityAnalyzer:
             dataset_path = os.path.join(self.__absolute_dirname, self.__dataset_dirname, comparison_dir)
         else:
             dataset_path = os.path.join(self.archive_path, self.__dataset_dirname, comparison_dir)
-        target_runs = get_sorted_list_of_runs(dataset_path, self.target_alg_abbr)
-        optimized_runs = get_sorted_list_of_runs(dataset_path, self.optimized_alg_abbr)
+        target_runs = get_sorted_list_of_runs(dataset_path, self.__target_alg_abbr)
+        optimized_runs = get_sorted_list_of_runs(dataset_path, self.__optimized_alg_abbr)
         if run_index >= len(target_runs) or run_index >= len(optimized_runs):
             raise ValueError(f"`run_index` {str(run_index)} out of range [0, {len(target_runs) - 1}].")
         target_run = SingleRunData.import_from_json(target_runs[run_index])
@@ -526,17 +553,20 @@ class MetaheuristicsSimilarityAnalyzer:
         num_metrics = len(self.meta_ga.indiv_diversity_metrics)
         lines = int((num_metrics - 1) / plots_per_line) + 1
         fig, axes = plt.subplots(lines, plots_per_line)
-        title = f"{comparison_index} comparison run {run_index} individual diversity metrics"
+        if title is None:
+            title = f"Comparison {comparison_index} run {run_index} individual diversity metrics"
         fig.suptitle(title, fontsize=23)
-        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.tight_layout(rect=(0, 0.03, 1, 0.95))
         fig.subplots_adjust(wspace=0.4, hspace=0.4)
 
         for idx, metric in enumerate(self.meta_ga.indiv_diversity_metrics):
             df_target_metric = target_metrics.filter(regex=metric.abbreviation())
-            df_target_metric.columns = df_target_metric.columns.str.replace(metric.abbreviation(), self.target_alg_abbr)
+            df_target_metric.columns = df_target_metric.columns.str.replace(
+                metric.abbreviation(), self.__target_alg_abbr
+            )
             df_optimized_metric = optimized_metrics.filter(regex=metric.abbreviation())
             df_optimized_metric.columns = df_optimized_metric.columns.str.replace(
-                metric.abbreviation(), self.optimized_alg_abbr
+                metric.abbreviation(), self.__optimized_alg_abbr
             )
             df_combined_metrics = pd.concat([df_target_metric, df_optimized_metric], axis=1)
             ax = df_combined_metrics.plot(
@@ -554,9 +584,10 @@ class MetaheuristicsSimilarityAnalyzer:
     ):
         r"""Creates and shows a figure showing the population diversity metrics of both metaheuristics.
 
-        Arguments:
+        Args:
             comparison_index (int): Index of the comparison to create a plot for.
-            run_index (Optional[str]): Index of the optimization run to plot the metrics for.
+            run_index (int): Index of the optimization run to plot the metrics for.
+            title (Optional[str]): Title of the plot.
             separate (Optional[bool]): Show diversity metrics on separate axes for better resolution.
 
         Raises:
@@ -572,8 +603,8 @@ class MetaheuristicsSimilarityAnalyzer:
             dataset_path = os.path.join(self.__absolute_dirname, self.__dataset_dirname, comparison_dir)
         else:
             dataset_path = os.path.join(self.archive_path, self.__dataset_dirname, comparison_dir)
-        target_runs = get_sorted_list_of_runs(dataset_path, self.target_alg_abbr)
-        optimized_runs = get_sorted_list_of_runs(dataset_path, self.optimized_alg_abbr)
+        target_runs = get_sorted_list_of_runs(dataset_path, self.__target_alg_abbr)
+        optimized_runs = get_sorted_list_of_runs(dataset_path, self.__optimized_alg_abbr)
         if run_index >= len(target_runs) or run_index >= len(optimized_runs):
             raise ValueError(f"`run_index` {str(run_index)} out of range [0, {len(target_runs) - 1}].")
         target_run = SingleRunData.import_from_json(target_runs[run_index])
@@ -581,7 +612,8 @@ class MetaheuristicsSimilarityAnalyzer:
         target_metrics = target_run.get_pop_diversity_metrics_values()
         optimized_metrics = optimized_run.get_pop_diversity_metrics_values()
 
-        title = f"{comparison_index} comparison run {run_index} population diversity metrics"
+        if title is None:
+            title = f"Comparison {comparison_index} run {run_index} population diversity metrics"
 
         if separate:
             num_metrics = len(self.meta_ga.pop_diversity_metrics)
@@ -591,11 +623,11 @@ class MetaheuristicsSimilarityAnalyzer:
             for idx, metric in enumerate(self.meta_ga.pop_diversity_metrics):
                 df_target_metric = target_metrics.filter(regex=metric.abbreviation())
                 df_target_metric.columns = df_target_metric.columns.str.replace(
-                    metric.abbreviation(), self.target_alg_abbr
+                    metric.abbreviation(), self.__target_alg_abbr
                 )
                 df_optimized_metric = optimized_metrics.filter(regex=metric.abbreviation())
                 df_optimized_metric.columns = df_optimized_metric.columns.str.replace(
-                    metric.abbreviation(), self.optimized_alg_abbr
+                    metric.abbreviation(), self.__optimized_alg_abbr
                 )
                 df_combined_metrics = pd.concat([df_target_metric, df_optimized_metric], axis=1)
                 ax = df_combined_metrics.plot(
@@ -608,16 +640,16 @@ class MetaheuristicsSimilarityAnalyzer:
                 ax.set_title(label=metric.abbreviation(), fontdict={"fontsize": 20})
             fig.tight_layout()
         else:
-            target_metrics = target_metrics.add_suffix(f"_{self.target_alg_abbr}")
-            optimized_metrics = optimized_metrics.add_suffix(f"_{self.optimized_alg_abbr}")
+            target_metrics = target_metrics.add_suffix(f"_{self.__target_alg_abbr}")
+            optimized_metrics = optimized_metrics.add_suffix(f"_{self.__optimized_alg_abbr}")
             df_combined_metrics = pd.concat([target_metrics, optimized_metrics], axis=1)
             line_styles = ["-", ":", "--", "-."]
             style = {}
             for idx, metric in enumerate(self.meta_ga.pop_diversity_metrics):
                 if idx > 3:
                     continue
-                style["_".join([metric.abbreviation(), self.target_alg_abbr])] = f"{line_styles[idx]}g"
-                style["_".join([metric.abbreviation(), self.optimized_alg_abbr])] = f"{line_styles[idx]}b"
+                style["_".join([metric.abbreviation(), self.__target_alg_abbr])] = f"{line_styles[idx]}g"
+                style["_".join([metric.abbreviation(), self.__optimized_alg_abbr])] = f"{line_styles[idx]}b"
 
             fig, axes = plt.subplots(1, 1)
             fig.suptitle(title, fontsize=23)
@@ -650,8 +682,8 @@ class MetaheuristicsSimilarityAnalyzer:
             1-accuracy scores (dict[str, numpy.ndarray[float]]): Dictionary containing 1-accuracy scores for test and
                 also train (if `get_train_accuracy` is True) subsets of both models.
         """
-        alg_1_label = self.target_alg_abbr
-        alg_2_label = self.optimized_alg_abbr
+        alg_1_label = self.__target_alg_abbr
+        alg_2_label = self.__optimized_alg_abbr
         _k_svm_scores = []
         _knn_scores = []
         comparisons = os.listdir(self.dataset_path)
@@ -663,8 +695,10 @@ class MetaheuristicsSimilarityAnalyzer:
             feature_vectors = []
             actual_labels = []
 
-            first_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.target_alg_abbr)
-            second_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.optimized_alg_abbr)
+            first_runs = get_sorted_list_of_runs(os.path.join(self.dataset_path, comparison), self.__target_alg_abbr)
+            second_runs = get_sorted_list_of_runs(
+                os.path.join(self.dataset_path, comparison), self.__optimized_alg_abbr
+            )
             for alg_label, runs in enumerate([first_runs, second_runs]):
                 for run_path in runs:
                     srd = SingleRunData.import_from_json(run_path)
@@ -830,7 +864,7 @@ class MetaheuristicsSimilarityAnalyzer:
         r"""Generate latex file containing MSA results in form of tables.
         Optionally also generate pdf file.
 
-        Arguments:
+        Args:
             filename (Optional[str]): Filename without extensions used for the .tex and .pdf files.
                 Composed if not provided.
             generate_pdf (Optional[bool]): Generates a .pdf file. Only .tex file is generated if false.
@@ -860,7 +894,7 @@ class MetaheuristicsSimilarityAnalyzer:
         doc.packages.append(Package("graphicx"))
         doc.packages.append(Package("amsmath"))
 
-        doc.append(Section(f"Comparison of {self.target_alg_abbr} and {self.optimized_alg_abbr}"))
+        doc.append(Section(f"Comparison of {self.__target_alg_abbr} and {self.__optimized_alg_abbr}"))
         doc.append(Subsection("Comparison of hyperparameters settings and similarity metrics"))
 
         # Table comparing hyperparameters settings and similarity metrics
@@ -881,7 +915,7 @@ class MetaheuristicsSimilarityAnalyzer:
         else:
             archive_path = self.archive_path
         if filename is None:
-            filename = f"{self.target_alg_abbr}-{self.optimized_alg_abbr}_MSA_results"
+            filename = f"{self.__target_alg_abbr}-{self.__optimized_alg_abbr}_MSA_results"
         if generate_pdf:
             doc.generate_pdf(
                 os.path.join(
@@ -920,12 +954,12 @@ class MetaheuristicsSimilarityAnalyzer:
         mc_target = MultiColumn(
             len(self.target_gene_space[next(iter(self.target_gene_space))]),
             align="c|",
-            data=self.target_alg_abbr,
+            data=self.__target_alg_abbr,
         )
         mc_optimized = MultiColumn(
             len(self.meta_ga.gene_space[next(iter(self.meta_ga.gene_space))]),
             align="c|",
-            data=self.optimized_alg_abbr,
+            data=self.__optimized_alg_abbr,
         )
         mc_metrics = MultiColumn(
             len(self.similarity_metrics),
@@ -1027,11 +1061,11 @@ class MetaheuristicsSimilarityAnalyzer:
         mc_target = MultiColumn(
             3,
             align="c|",
-            data=self.target_alg_abbr,
+            data=self.__target_alg_abbr,
         )
         mc_optimized = MultiColumn(
             3,
-            data=self.optimized_alg_abbr,
+            data=self.__optimized_alg_abbr,
         )
 
         fitness_table.add_hline()
@@ -1050,7 +1084,7 @@ class MetaheuristicsSimilarityAnalyzer:
         # Collect fitness data from metaheuristic optimization runs
         fitness_statistics = []
 
-        for alg_abbr in (self.target_alg_abbr, self.optimized_alg_abbr):
+        for alg_abbr in (self.__target_alg_abbr, self.__optimized_alg_abbr):
             mean_fitness = []
             min_fitness = []
             std_fitness = []
@@ -1101,7 +1135,7 @@ class MetaheuristicsSimilarityAnalyzer:
         graph_color: str = "grey",
         sub_graph_color: str = "lightgrey",
     ):
-        r"""Produces a scheme of metaheuristic similarity analyzer configuration.
+        r"""Produces a scheme of the MetaheuristicsSimilarityAnalyzer configuration.
 
         Args:
             filename (Optional[str]): Name of the scheme image file.
@@ -1266,7 +1300,7 @@ class MetaheuristicsSimilarityAnalyzer:
                     </tr>
                     <tr>
                         <td>rng seed</td>
-                        <td>{self.meta_ga.rng_seed}</td>
+                        <td>run index</td>
                     </tr>
                 </table>>"""
 

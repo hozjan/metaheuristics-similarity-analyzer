@@ -1,4 +1,6 @@
 import numpy.typing as npt
+from typing import Optional
+from collections.abc import Callable
 from niapy.problems import Problem
 from niapy.algorithms import Algorithm
 from datetime import datetime
@@ -33,9 +35,46 @@ __all__ = ["MetaGA"]
 
 
 class MetaGA:
-    r"""Class containing metadata of meta genetic algorithm."""
+    r"""Class using `pygad` `GA` class creating a meta genetic algorithm equipped with fitness
+    functions to perform similarity analysis and parameter tuning of the metaheuristics.
 
-    # TODO add attributes
+    Attributes:
+        fitness_function_type (MetaGAFitnessFunction): Type of fitness function of meta genetic algorithm.
+        ga_generations (int): Number of generations of the genetic algorithm.
+        ga_solutions_per_pop (int): Number of solutions per generation of the genetic algorithm.
+        ga_percent_parents_mating (int): Percentage of parents mating for production of the offspring of the
+            genetic algorithm [1, 100].
+        ga_parent_selection_type (str): Type of parent selection of the genetic algorithm.
+        ga_k_tournament (int): Number of parents participating in the tournament selection of the genetic
+            algorithm. Only has effect when ga_parent_selection_type equals 'tournament'.
+        ga_crossover_type (str): Crossover type of the genetic algorithm.
+        ga_mutation_type (str): Mutation type of the genetic algorithm.
+        ga_crossover_probability (float): Crossover probability of the genetic algorithm [0,1].
+        ga_mutation_num_genes (int): Number of genes mutated in the solution of the genetic algorithm.
+        ga_keep_elitism (int): Number of solutions that are a part of the elitism of the genetic algorithm.
+        gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]): Gene space of the solution.
+        pop_size (int): Population size of the metaheuristics being optimized.
+        problem (Problem): Optimization problem used for optimization.
+        max_iters (int | float): Maximum number of iterations of the metaheuristic being optimized for
+            each solution of the genetic algorithm.
+        max_evals (int | float): Maximum number of evaluations of the metaheuristic being optimized for
+            each solution of the genetic algorithm.
+        num_runs (int): Number of runs performed by the metaheuristic being optimized for each solution
+            of the genetic algorithm.
+        pop_diversity_metrics (list[PopDiversityMetric]): List of population diversity metrics calculated.
+            Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
+        indiv_diversity_metrics (list[IndivDiversityMetric]): List of individual diversity metrics
+            calculated. Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
+        base_archive_path (str): Base archive path of the MetaGA.
+        archive_path (str): Archive path including `base_archive_path` followed by /`prefix`_`suffix`.
+            Generated when calling `run_meta_ga`.
+        meta_ga (GA): Instance of the `pygad` `GA` class used for meta-optimization.
+        combined_gene_space (list[dict[str, float]]): combined list of all attribute ranges/settings in `gene_space`.
+        low_ranges (list[float]): List of minimum values of each `gene_space` attribute range.
+        high_ranges (list[float]): List of maximum values of each `gene_space` attribute range.
+        random_mutation_min_val (list[float]): List of Lowest values by which each gene can change.
+        random_mutation_max_val (list[float]): List of Highest values by which each gene can change.
+    """
 
     def __init__(
         self,
@@ -56,9 +95,8 @@ class MetaGA:
         max_iters: int | float = np.inf,
         max_evals: int | float = np.inf,
         num_runs: int = 10,
-        pop_diversity_metrics: list[PopDiversityMetric] | None = None,
-        indiv_diversity_metrics: list[IndivDiversityMetric] | None = None,
-        rng_seed: int | None = None,
+        pop_diversity_metrics: list[PopDiversityMetric] = [],
+        indiv_diversity_metrics: list[IndivDiversityMetric] = [],
         base_archive_path="archive",
     ):
         r"""Initialize meta genetic algorithm.
@@ -90,18 +128,16 @@ class MetaGA:
                 Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             indiv_diversity_metrics (Optional[list[IndivDiversityMetric]]): List of individual diversity metrics
                 calculated. Only has effect when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
-            rng_seed (Optional[int]): Seed of the random generator. Provide for reproducible results. Only has effect
-                when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             base_archive_path (Optional[str]): Base archive path of the meta genetic algorithm.
 
+        Raises:
             ValueError: No diversity metrics defined when required.
             ValueError: Neither of `max_evals` or `max_iters` was assigned a finite value.
             ValueError: Incorrect number of algorithms defined in the provided `gene_space`.
-            TypeError: Provided `problem` is of incorrect type.
         """
 
         if fitness_function_type is MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY and (
-            pop_diversity_metrics is None or indiv_diversity_metrics is None
+            len(pop_diversity_metrics) == 0 or len(indiv_diversity_metrics) == 0
         ):
             raise ValueError(
                 "Diversity metrics must be defined when fitness_function_type set to `PERFORMANCE_SIMILARITY`."
@@ -112,9 +148,6 @@ class MetaGA:
 
         if len(gene_space) != 1:
             raise ValueError("Only one algorithm must be defined in the `gene_space` provided.")
-
-        if not isinstance(problem, Problem):
-            raise TypeError(f"Provided problem type `{type(problem).__name__}` is not compatible.")
 
         self.fitness_function_type = fitness_function_type
         self.gene_space = gene_space
@@ -135,21 +168,21 @@ class MetaGA:
         self.num_runs = num_runs
         self.pop_diversity_metrics = pop_diversity_metrics
         self.indiv_diversity_metrics = indiv_diversity_metrics
-        self.rng_seed = rng_seed
         self.base_archive_path = base_archive_path
 
-        self.meta_ga: pygad.GA | None = None
+        self.meta_ga: Optional[pygad.GA] = None
         self.combined_gene_space: list[dict[str, float]] = []
         self.low_ranges: list[float] = []
         self.high_ranges: list[float] = []
         self.random_mutation_min_val: list[float] = []
         self.random_mutation_max_val: list[float] = []
         self.archive_path = ""
-        self.__fitness_function = None
+        self.__fitness_function: Optional[Callable] = None
         self.__optimized_algorithm = Algorithm()
         self.__target_algorithm = Algorithm()
         self.__meta_dataset = "meta_dataset"
         self.__meta_ga_tmp_data_path = ""
+        self.__absolute_dirname = None
         self.__init_parameters()
 
     def __init_parameters(self):
@@ -246,7 +279,7 @@ class MetaGA:
         solution: list[float] | npt.NDArray,
         gene_space: dict[str | Algorithm, dict[str, dict[str, float]]],
         pop_size: int,
-    ):
+    ) -> Algorithm:
         r"""Apply meta genetic algorithm solution to an corresponding algorithm based on
         the gene space used for the meta optimization. Make sure the solution matches the gene space.
 
@@ -293,7 +326,7 @@ class MetaGA:
     def __clean_tmp_data(self):
         r"""Clean up temporary data created by the meta genetic algorithm."""
         try:
-            print("Cleaning up meta-GA temporary data...")
+            print("Cleaning up Meta-GA temporary data...")
             if os.path.exists(self.__meta_ga_tmp_data_path):
                 shutil.rmtree(self.__meta_ga_tmp_data_path)
         except Exception:
@@ -387,30 +420,32 @@ class MetaGA:
 
     def run_meta_ga(
         self,
-        filename="meta_ga_obj",
-        log_filename="meta_ga_log_file",
         target_algorithm: Algorithm | None = None,
         get_info: bool = False,
         prefix: str | None = None,
         suffix: str | None = None,
-        log_headline="Meta-GA_log",
+        log_filename: str = "meta_ga_log_file",
+        log_headline: str = "Meta-GA_log",
+        export: bool = False,
+        pkl_filename: str = "meta_ga_obj",
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
         Args:
-            filename (Optional[str]): Name of the .pkl file for this Meta-GA instance to be exported to.
-            log_filename (Optional[str]): Name of the generated log file.
-            target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity evaluation.
-                Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
+            target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity
+                evaluation. Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
             prefix (Optional[str]): Use custom prefix for the name of the base folder in structure. Uses current
                 datetime by default.
             suffix (Optional[str]): Use custom suffix for the name of the base folder in structure. Uses the
                 abbreviation of the selected algorithm and name of the optimization problem by default.
+            log_filename (Optional[str]): Name of the generated log file.
             log_headline (Optional[str]): First line to be written to the log.
+            export (Optional[bool]): Export MetaGA object to pkl after analysis.
+            pkl_filename (Optional[str]): Filename of the exported .pkl file. Used if `export` is true.
 
         Returns:
-            best_solution (numpy.ndarray[float]): Returns best solution.
+            best_solution (numpy.ndarray[float]): Best solution.
 
         Raises:
             ValueError: `target_algorithm` was not provided when required.
@@ -430,7 +465,6 @@ class MetaGA:
             else:
                 self.__target_algorithm = target_algorithm
 
-        warnings.filterwarnings("ignore", category=UserWarning)
         start = time.time()
         self.__create_folder_structure(prefix=prefix, suffix=suffix)
         self.__before_meta_optimization()
@@ -442,49 +476,54 @@ class MetaGA:
 
         num_parents_mating = int(self.ga_solutions_per_pop * (self.ga_percent_parents_mating / 100))
 
-        self.meta_ga = pygad.GA(
-            num_generations=self.ga_generations,
-            num_parents_mating=num_parents_mating,
-            keep_elitism=self.ga_keep_elitism,
-            allow_duplicate_genes=False,
-            fitness_func=self.__fitness_function,
-            sol_per_pop=self.ga_solutions_per_pop,
-            num_genes=len(self.combined_gene_space),
-            parent_selection_type=self.ga_parent_selection_type,
-            K_tournament=self.ga_k_tournament,
-            init_range_low=self.low_ranges,
-            init_range_high=self.high_ranges,
-            crossover_type=self.ga_crossover_type,
-            crossover_probability=self.ga_crossover_probability,
-            mutation_type=self.ga_mutation_type,
-            mutation_num_genes=self.ga_mutation_num_genes,
-            random_mutation_min_val=self.random_mutation_min_val,
-            random_mutation_max_val=self.random_mutation_max_val,
-            gene_space=self.combined_gene_space,
-            on_generation=self.on_generation_progress,
-            save_best_solutions=True,
-            save_solutions=True,
-            logger=self.__get_logger(filename=os.path.join(self.archive_path, log_filename)),
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            self.meta_ga = pygad.GA(
+                num_generations=self.ga_generations,
+                num_parents_mating=num_parents_mating,
+                keep_elitism=self.ga_keep_elitism,
+                allow_duplicate_genes=False,
+                fitness_func=self.__fitness_function,
+                sol_per_pop=self.ga_solutions_per_pop,
+                num_genes=len(self.combined_gene_space),
+                parent_selection_type=self.ga_parent_selection_type,
+                K_tournament=self.ga_k_tournament,
+                init_range_low=self.low_ranges,
+                init_range_high=self.high_ranges,
+                crossover_type=self.ga_crossover_type,
+                crossover_probability=self.ga_crossover_probability,
+                mutation_type=self.ga_mutation_type,
+                mutation_num_genes=self.ga_mutation_num_genes,
+                random_mutation_min_val=self.random_mutation_min_val,
+                random_mutation_max_val=self.random_mutation_max_val,
+                gene_space=self.combined_gene_space,
+                on_generation=self.on_generation_progress,
+                save_best_solutions=True,
+                save_solutions=True,
+                logger=self.__get_logger(filename=os.path.join(self.archive_path, log_filename)),
+            )
 
-        self.meta_ga.logger.info(log_headline)
-        self.meta_ga.run()
+            self.meta_ga.logger.info(log_headline)
+            self.meta_ga.run()
         self.meta_ga.logger.info(f"Time elapsed: {timer(start, time.time())}")
         self.meta_ga.logger.handlers.clear()
         self.__clean_tmp_data()
         best_solutions = self.meta_ga.best_solutions
         print(f"{self.__optimized_algorithm.Name[1]} best solution: {best_solutions[-1]}")
-        self.export_to_pkl(filename)
+
+        if export:
+            self.export_to_pkl(pkl_filename)
 
         return np.array(best_solutions[-1])
 
     def export_to_pkl(self, filename):
         """
-        Export instance of the meta-GA as .pkl.
+        Export instance of the MetaGA as .pkl.
 
         Args:
             filename (str): Filename of the output file. File extension .pkl included upon export.
         """
+        self.__absolute_dirname = None
         filename = os.path.join(self.archive_path, filename)
         meta_ga = cloudpickle.dumps(self)
         with open(filename + ".pkl", "wb") as file:
@@ -494,17 +533,18 @@ class MetaGA:
     @staticmethod
     def import_from_pkl(filename) -> "MetaGA":
         """
-        Import saved instance of the meta-GA.
+        Import saved instance of the MetaGA.
 
         Args:
             filename (str): Filename of the file to import. File extension .pkl included upon import.
 
         Returns:
-            msa (MetaGA): Meta-GA instance.
+            msa (MetaGA): MetaGA instance.
 
         Raises:
             FileNotFoundError: File not found.
             BaseException: File could not be loaded.
+            TypeError: Imported object is not a `MetaGA` instance.
         """
 
         try:
@@ -514,25 +554,65 @@ class MetaGA:
             raise FileNotFoundError(f"File {filename}.pkl not found.")
         except Exception:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
+        meta_ga.__absolute_dirname = os.path.join(os.getcwd(), os.path.dirname(filename))
+        if not isinstance(meta_ga, MetaGA):
+            raise TypeError("Provided .pkl file is not a `MetaGA` export.")
         return meta_ga
 
-    def plot_solutions(self, title: str, file_path: str, all_solutions: bool = False):
-        r"""Creates and shows a figure showing the solutions trough Meta-GA generations.
+    def plot_solutions(
+        self,
+        filename: str = "meta_ga_solution_evolution",
+        all_solutions: bool = False,
+    ):
+        r"""Creates and shows a figure showing the solutions trough MetaGA generations.
 
-        Arguments:
-            title (str): Title of the plot.
-            file_path (Optional[str]): File path including filename of the file saved.
+        Args:
+            filename (Optional[str]): Filename of the .png file saved.
+                File is saved under the corresponding archive directory.
                 File extension .png included automatically.
-            all_solutions (Optional[str]): Plot evolution including all solutions.
+            all_solutions (Optional[bool]): Plot evolution including all solutions.
                 If false only the best solution of each generation is plotted.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
         """
-        warnings.filterwarnings("ignore", category=UserWarning)
+
+        if self.__absolute_dirname is not None:
+            file_path = os.path.join(self.__absolute_dirname, filename)
+        else:
+            file_path = os.path.join(self.archive_path, filename)
+        solutions = "all" if all_solutions else "best"
+        title = f"{self.__optimized_algorithm.Name[1]} Meta-GA {solutions} solutions"
+        self._plot_solutions(title=title, file_path=file_path, all_solutions=all_solutions)
+
+    def _plot_solutions(
+        self,
+        title: str,
+        file_path: str,
+        all_solutions: bool = False,
+    ):
+        r"""Creates and shows a figure showing the solutions trough MetaGA generations.
+
+        Args:
+            title (str): Title of the solutions plot.
+            file_path (str): File path including filename of the file saved.
+                File extension .png included automatically.
+            all_solutions (Optional[bool]): Plot evolution including all solutions.
+                If false only the best solution of each generation is plotted.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
+        """
+        if self.meta_ga is None:
+            raise ValueError("`run_meta_ga` has not been called yet. No data to plot.")
         solutions = "all" if all_solutions else "best"
         # Switch to non-interactive backend to prevent
         # the unmodified figure from showing.
         original_backend = plt.get_backend()
         plt.switch_backend("agg")
-        original_fig = self.meta_ga.plot_genes(solutions=solutions, plot_type="scatter")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            original_fig = self.meta_ga.plot_genes(solutions=solutions, plot_type="scatter")
         plt.switch_backend(original_backend)
         # Improve figure and add setting labels.
         original_fig.subplots_adjust(wspace=0.2, hspace=0.1)
@@ -553,19 +633,43 @@ class MetaGA:
         plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         plt.show()
 
-    def plot_fitness(self, title: str, file_path: str):
-        r"""Creates and shows a figure showing the fitness trough Meta-GA generations.
+    def plot_fitness(self, filename: str = "meta_ga_fitness_plot"):
+        r"""Creates and shows a figure showing the fitness trough MetaGA generations.
 
-        Arguments:
-            title (Optional[str]): Title of the fitness plot.
-            file_path (Optional[str]): File path including filename of the file saved.
+        Args:
+            filename (Optional[str]): Filename of the .png file saved.
+                File is saved under the corresponding archive directory.
                 File extension .png included automatically.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
         """
-        warnings.filterwarnings("ignore", category=UserWarning)
-        self.meta_ga.plot_fitness(
-            title=title,
-            save_dir=f"{file_path}.png",
-        )
+        if self.__absolute_dirname is not None:
+            file_path = os.path.join(self.__absolute_dirname, filename)
+        else:
+            file_path = os.path.join(self.archive_path, filename)
+        title = f"{self.__optimized_algorithm.Name[1]} Meta-GA fitness"
+        self._plot_fitness(title=title, file_path=file_path)
+
+    def _plot_fitness(self, title: str, file_path: str):
+        r"""Creates and shows a figure showing the fitness trough MetaGA generations.
+
+        Args:
+            title (str): Title of the fitness plot.
+            file_path (str): File path including filename of the file saved.
+                File extension .png included automatically.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
+        """
+        if self.meta_ga is None:
+            raise ValueError("`run_meta_ga` has not been called yet. No data to plot.")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            self.meta_ga.plot_fitness(
+                title=title,
+                save_dir=f"{file_path}.png",
+            )
 
     def meta_ga_info(
         self,
@@ -575,7 +679,7 @@ class MetaGA:
         graph_color: str = "grey",
         sub_graph_color: str = "lightgrey",
     ):
-        r"""Produces a scheme of meta genetic algorithm configuration.
+        r"""Produces a scheme of the MetaGA configuration.
 
         Args:
             filename (Optional[str]): Name of the scheme image file.
@@ -651,7 +755,7 @@ class MetaGA:
                     </tr>
                     <tr>
                         <td>rng seed</td>
-                        <td>{self.rng_seed}</td>
+                        <td>run index</td>
                     </tr>
                 </table>>"""
             c.node(name="meta_ga_parameters", label=meta_ga_parameters_label)
@@ -679,7 +783,7 @@ class MetaGA:
                         <td>pop size</td>
                         <td>{self.pop_size}</td>
                     </tr></table>>"""
-                    cc.node(name=f"target_gene_space", label=node_label)
+                    cc.node(name="target_gene_space", label=node_label)
 
             with c.subgraph(name="cluster_00") as cc:
                 cc.attr(
@@ -696,7 +800,6 @@ class MetaGA:
                     margin="0",
                 )
                 combined_gene_space_len = 0
-                alg_name = self.__optimized_algorithm.__class__.__name__
                 node_label = f"""<<table border="0" cellborder="1" cellspacing="0">
                     <tr>
                         <td colspan="2"><b>{self.__optimized_algorithm.Name[1]}</b></td>
@@ -705,14 +808,15 @@ class MetaGA:
                         <td>pop size</td>
                         <td>{self.pop_size}</td>
                     </tr>"""
-                for setting in self.gene_space[alg_name]:
-                    gene = ", ".join(str(value) for value in self.gene_space[alg_name][setting].values())
-                    combined_gene_space_len += 1
-                    node_label += f"""<tr>
-                        <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
-                    </tr>"""
+                for alg_name in self.gene_space:
+                    for setting in self.gene_space[alg_name]:
+                        gene = ", ".join(str(value) for value in self.gene_space[alg_name][setting].values())
+                        combined_gene_space_len += 1
+                        node_label += f"""<tr>
+                            <td>{setting}</td><td>[{gene}]<sub> g<i>{combined_gene_space_len}</i></sub></td>
+                        </tr>"""
                 node_label += "</table>>"
-                cc.node(name=f"gene_space", label=node_label)
+                cc.node(name="gene_space", label=node_label)
 
                 combined_gene_string = f"""<
                 <table border="0" cellborder="1" cellspacing="0">
@@ -728,7 +832,7 @@ class MetaGA:
                     </tr>
                 </table>>"""
                 cc.node(name="combined_gene_space", label=combined_gene_string)
-                cc.edge(f"gene_space", "combined_gene_space")
+                cc.edge("gene_space", "combined_gene_space")
 
         with gv.subgraph(name="cluster_1") as c:
             c.attr(

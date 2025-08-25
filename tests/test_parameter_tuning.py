@@ -1,7 +1,6 @@
 from unittest import TestCase
 import os
 import shutil
-import pygad
 from niapy.problems.schwefel import Schwefel
 from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 
@@ -12,14 +11,6 @@ GENE_SPACE = {
         "pulse_rate": {"low": 0.01, "high": 1.0, "step": 0.01},
         "alpha": {"low": 0.9, "high": 1.0, "step": 0.001},
         "gamma": {"low": 0.0, "high": 1.0, "step": 0.01},
-    }
-}
-
-TARGET_GENE_SPACE = {
-    "ParticleSwarmAlgorithm": {
-        "c1": {"low": 0.01, "high": 2.5, "step": 0.01},
-        "c2": {"low": 0.01, "high": 2.5, "step": 0.01},
-        "w": {"low": 0.0, "high": 1.0, "step": 0.01},
     }
 }
 
@@ -58,7 +49,7 @@ class TestParameterTuning(TestCase):
 
         # Act
         meta_ga_filename = "meta_ga_obj"
-        meta_ga.run_meta_ga(filename=meta_ga_filename)
+        meta_ga.run_meta_ga(export=True, pkl_filename=meta_ga_filename)
         archive_path = meta_ga.archive_path
         meta_ga_save = MetaGA.import_from_pkl(os.path.join(archive_path, meta_ga_filename))
 
