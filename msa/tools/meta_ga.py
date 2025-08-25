@@ -134,7 +134,6 @@ class MetaGA:
             ValueError: No diversity metrics defined when required.
             ValueError: Neither of `max_evals` or `max_iters` was assigned a finite value.
             ValueError: Incorrect number of algorithms defined in the provided `gene_space`.
-            TypeError: Provided `problem` is of incorrect type.
         """
 
         if fitness_function_type is MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY and (
@@ -183,6 +182,7 @@ class MetaGA:
         self.__target_algorithm = Algorithm()
         self.__meta_dataset = "meta_dataset"
         self.__meta_ga_tmp_data_path = ""
+        self.__absolute_dirname = None
         self.__init_parameters()
 
     def __init_parameters(self):
@@ -420,19 +420,18 @@ class MetaGA:
 
     def run_meta_ga(
         self,
-        filename="meta_ga_obj",
-        log_filename="meta_ga_log_file",
         target_algorithm: Algorithm | None = None,
         get_info: bool = False,
         prefix: str | None = None,
         suffix: str | None = None,
-        log_headline="Meta-GA_log",
+        log_filename: str = "meta_ga_log_file",
+        log_headline: str = "Meta-GA_log",
+        export: bool = False,
+        pkl_filename: str = "meta_ga_obj",
     ):
         r"""Run meta genetic algorithm. Saves pygad.GA instance and fitness plot image as a result of the optimization.
 
         Args:
-            filename (Optional[str]): Name of the .pkl file for this MetaGA instance to be exported to.
-            log_filename (Optional[str]): Name of the generated log file.
             target_algorithm (Optional[Algorithm]): Pre-configured target algorithm for the performance similarity
                 evaluation. Only required when fitness_function_type set to `TARGET_PERFORMANCE_SIMILARITY`.
             get_info (Optional[bool]): Generate info scheme of the meta genetic algorithm (false by default).
@@ -440,7 +439,10 @@ class MetaGA:
                 datetime by default.
             suffix (Optional[str]): Use custom suffix for the name of the base folder in structure. Uses the
                 abbreviation of the selected algorithm and name of the optimization problem by default.
+            log_filename (Optional[str]): Name of the generated log file.
             log_headline (Optional[str]): First line to be written to the log.
+            export (Optional[bool]): Export MetaGA object to pkl after analysis.
+            pkl_filename (Optional[str]): Filename of the exported .pkl file. Used if `export` is true.
 
         Returns:
             best_solution (numpy.ndarray[float]): Best solution.
@@ -463,7 +465,6 @@ class MetaGA:
             else:
                 self.__target_algorithm = target_algorithm
 
-        warnings.filterwarnings("ignore", category=UserWarning)
         start = time.time()
         self.__create_folder_structure(prefix=prefix, suffix=suffix)
         self.__before_meta_optimization()
@@ -475,39 +476,43 @@ class MetaGA:
 
         num_parents_mating = int(self.ga_solutions_per_pop * (self.ga_percent_parents_mating / 100))
 
-        self.meta_ga = pygad.GA(
-            num_generations=self.ga_generations,
-            num_parents_mating=num_parents_mating,
-            keep_elitism=self.ga_keep_elitism,
-            allow_duplicate_genes=False,
-            fitness_func=self.__fitness_function,
-            sol_per_pop=self.ga_solutions_per_pop,
-            num_genes=len(self.combined_gene_space),
-            parent_selection_type=self.ga_parent_selection_type,
-            K_tournament=self.ga_k_tournament,
-            init_range_low=self.low_ranges,
-            init_range_high=self.high_ranges,
-            crossover_type=self.ga_crossover_type,
-            crossover_probability=self.ga_crossover_probability,
-            mutation_type=self.ga_mutation_type,
-            mutation_num_genes=self.ga_mutation_num_genes,
-            random_mutation_min_val=self.random_mutation_min_val,
-            random_mutation_max_val=self.random_mutation_max_val,
-            gene_space=self.combined_gene_space,
-            on_generation=self.on_generation_progress,
-            save_best_solutions=True,
-            save_solutions=True,
-            logger=self.__get_logger(filename=os.path.join(self.archive_path, log_filename)),
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            self.meta_ga = pygad.GA(
+                num_generations=self.ga_generations,
+                num_parents_mating=num_parents_mating,
+                keep_elitism=self.ga_keep_elitism,
+                allow_duplicate_genes=False,
+                fitness_func=self.__fitness_function,
+                sol_per_pop=self.ga_solutions_per_pop,
+                num_genes=len(self.combined_gene_space),
+                parent_selection_type=self.ga_parent_selection_type,
+                K_tournament=self.ga_k_tournament,
+                init_range_low=self.low_ranges,
+                init_range_high=self.high_ranges,
+                crossover_type=self.ga_crossover_type,
+                crossover_probability=self.ga_crossover_probability,
+                mutation_type=self.ga_mutation_type,
+                mutation_num_genes=self.ga_mutation_num_genes,
+                random_mutation_min_val=self.random_mutation_min_val,
+                random_mutation_max_val=self.random_mutation_max_val,
+                gene_space=self.combined_gene_space,
+                on_generation=self.on_generation_progress,
+                save_best_solutions=True,
+                save_solutions=True,
+                logger=self.__get_logger(filename=os.path.join(self.archive_path, log_filename)),
+            )
 
-        self.meta_ga.logger.info(log_headline)
-        self.meta_ga.run()
+            self.meta_ga.logger.info(log_headline)
+            self.meta_ga.run()
         self.meta_ga.logger.info(f"Time elapsed: {timer(start, time.time())}")
         self.meta_ga.logger.handlers.clear()
         self.__clean_tmp_data()
         best_solutions = self.meta_ga.best_solutions
         print(f"{self.__optimized_algorithm.Name[1]} best solution: {best_solutions[-1]}")
-        self.export_to_pkl(filename)
+
+        if export:
+            self.export_to_pkl(pkl_filename)
 
         return np.array(best_solutions[-1])
 
@@ -518,6 +523,7 @@ class MetaGA:
         Args:
             filename (str): Filename of the output file. File extension .pkl included upon export.
         """
+        self.__absolute_dirname = None
         filename = os.path.join(self.archive_path, filename)
         meta_ga = cloudpickle.dumps(self)
         with open(filename + ".pkl", "wb") as file:
@@ -548,18 +554,50 @@ class MetaGA:
             raise FileNotFoundError(f"File {filename}.pkl not found.")
         except Exception:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
+        meta_ga.__absolute_dirname = os.path.join(os.getcwd(), os.path.dirname(filename))
         if not isinstance(meta_ga, MetaGA):
             raise TypeError("Provided .pkl file is not a `MetaGA` export.")
         return meta_ga
 
-    def plot_solutions(self, title: str, file_path: str, all_solutions: bool = False):
+    def plot_solutions(
+        self,
+        filename: str = "meta_ga_solution_evolution",
+        all_solutions: bool = False,
+    ):
         r"""Creates and shows a figure showing the solutions trough MetaGA generations.
 
         Args:
-            title (str): Title of the plot.
-            file_path (Optional[str]): File path including filename of the file saved.
+            filename (Optional[str]): Filename of the .png file saved.
+                File is saved under the corresponding archive directory.
                 File extension .png included automatically.
-            all_solutions (Optional[str]): Plot evolution including all solutions.
+            all_solutions (Optional[bool]): Plot evolution including all solutions.
+                If false only the best solution of each generation is plotted.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
+        """
+
+        if self.__absolute_dirname is not None:
+            file_path = os.path.join(self.__absolute_dirname, filename)
+        else:
+            file_path = os.path.join(self.archive_path, filename)
+        solutions = "all" if all_solutions else "best"
+        title = f"{self.__optimized_algorithm.Name[1]} Meta-GA {solutions} solutions"
+        self._plot_solutions(title=title, file_path=file_path, all_solutions=all_solutions)
+
+    def _plot_solutions(
+        self,
+        title: str,
+        file_path: str,
+        all_solutions: bool = False,
+    ):
+        r"""Creates and shows a figure showing the solutions trough MetaGA generations.
+
+        Args:
+            title (str): Title of the solutions plot.
+            file_path (str): File path including filename of the file saved.
+                File extension .png included automatically.
+            all_solutions (Optional[bool]): Plot evolution including all solutions.
                 If false only the best solution of each generation is plotted.
 
         Raises:
@@ -567,13 +605,14 @@ class MetaGA:
         """
         if self.meta_ga is None:
             raise ValueError("`run_meta_ga` has not been called yet. No data to plot.")
-        warnings.filterwarnings("ignore", category=UserWarning)
         solutions = "all" if all_solutions else "best"
         # Switch to non-interactive backend to prevent
         # the unmodified figure from showing.
         original_backend = plt.get_backend()
         plt.switch_backend("agg")
-        original_fig = self.meta_ga.plot_genes(solutions=solutions, plot_type="scatter")
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            original_fig = self.meta_ga.plot_genes(solutions=solutions, plot_type="scatter")
         plt.switch_backend(original_backend)
         # Improve figure and add setting labels.
         original_fig.subplots_adjust(wspace=0.2, hspace=0.1)
@@ -594,12 +633,30 @@ class MetaGA:
         plt.subplots_adjust(left=0, right=1, top=1, bottom=0)
         plt.show()
 
-    def plot_fitness(self, title: str, file_path: str):
+    def plot_fitness(self, filename: str = "meta_ga_fitness_plot"):
         r"""Creates and shows a figure showing the fitness trough MetaGA generations.
 
         Args:
-            title (Optional[str]): Title of the fitness plot.
-            file_path (Optional[str]): File path including filename of the file saved.
+            filename (Optional[str]): Filename of the .png file saved.
+                File is saved under the corresponding archive directory.
+                File extension .png included automatically.
+
+        Raises:
+            ValueError: `run_meta_ga` has not been called yet. No data to plot.
+        """
+        if self.__absolute_dirname is not None:
+            file_path = os.path.join(self.__absolute_dirname, filename)
+        else:
+            file_path = os.path.join(self.archive_path, filename)
+        title = f"{self.__optimized_algorithm.Name[1]} Meta-GA fitness"
+        self._plot_fitness(title=title, file_path=file_path)
+
+    def _plot_fitness(self, title: str, file_path: str):
+        r"""Creates and shows a figure showing the fitness trough MetaGA generations.
+
+        Args:
+            title (str): Title of the fitness plot.
+            file_path (str): File path including filename of the file saved.
                 File extension .png included automatically.
 
         Raises:
@@ -607,11 +664,12 @@ class MetaGA:
         """
         if self.meta_ga is None:
             raise ValueError("`run_meta_ga` has not been called yet. No data to plot.")
-        warnings.filterwarnings("ignore", category=UserWarning)
-        self.meta_ga.plot_fitness(
-            title=title,
-            save_dir=f"{file_path}.png",
-        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            self.meta_ga.plot_fitness(
+                title=title,
+                save_dir=f"{file_path}.png",
+            )
 
     def meta_ga_info(
         self,

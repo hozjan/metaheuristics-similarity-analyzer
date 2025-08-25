@@ -49,7 +49,7 @@ class TestParameterTuning(TestCase):
 
         # Act
         meta_ga_filename = "meta_ga_obj"
-        meta_ga.run_meta_ga(filename=meta_ga_filename)
+        meta_ga.run_meta_ga(export=True, pkl_filename=meta_ga_filename)
         archive_path = meta_ga.archive_path
         meta_ga_save = MetaGA.import_from_pkl(os.path.join(archive_path, meta_ga_filename))
 
