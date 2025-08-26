@@ -2,7 +2,13 @@
 
 This repository contains the source code of the experiments in the paper ***Measuring the similarity of metaheuristic search strategies with machine learning models***. MHSA provides an alternative way to compare and analyze metaheuristic-search strategies with the help of machine learning.
 
-## Usage
+## 📦 Installation
+To install `MHSA` with pip, use:
+```bash
+pip install mhsa
+```
+
+## 🧪 Usage
 To use MHSA for similarity analysis we first have to define the gene spaces which will be used by the genetic algorithm. First key of the gene space dictionary must correspond with the class name of the the algorithm which must be implemented in the [NiaPy](https://github.com/NiaOrg/NiaPy?tab=readme-ov-file) micro-framework. In this case we chose `BatAlgorithm` and `ParticleSwarmAlgorithm`.
 
 ```python
@@ -99,7 +105,7 @@ After the analysis we can choose to export results of the analysis as a .pdf and
 ```python
 mhsa.export_results_to_latex(generate_pdf=True)
 ```
-For more information check out [examples](/examples).
+For more information check out [examples](https://github.com/hozjan/metaheuristics-similarity-analyzer/tree/develop/examples).
 
 ## This project depends on
 ### [NiaPy](https://github.com/NiaOrg/NiaPy?tab=readme-ov-file) Python microframework
