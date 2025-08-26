@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 from types import FunctionType
+import warnings
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -26,8 +27,7 @@ class JsonEncoder(JSONEncoder):
 
 
 class IndivDiversityMetric(ABC):
-    r"""Class representing a individual diversity metric.
-    """
+    r"""Class representing a individual diversity metric."""
 
     def __init__(self, *args, **kwargs):
         r"""Initialize individual diversity metric."""
@@ -55,8 +55,7 @@ class IndivDiversityMetric(ABC):
 
 
 class PopDiversityMetric(ABC):
-    r"""Class representing a population diversity metric.
-    """
+    r"""Class representing a population diversity metric."""
 
     def __init__(self, *args, **kwargs):
         r"""Initialize population diversity metric."""
@@ -84,18 +83,19 @@ class PopDiversityMetric(ABC):
 
 
 class PopulationData:
-    r"""Class for archiving population data. Contains population, diversity
-    metrics etc.
+    r"""Class for the archiving of the population data. Contains the values
+    of the individuals vectors of the population, population diversity metrics
+    values etc.
 
     Attributes:
-        population (Optional[numpy.ndarray]): Population.
-            population_fitness (Optional[numpy.ndarray]): Population fitness.
-            best_solution (Optional[numpy.ndarray]): Best solution in the
-                population.
-            best_fitness (Optional[float]): Fitness of the best solution in
-                the population.
-            metrics_values (Dict[str, np.ndarray]): Dictionary of population
-                diversity metrics values.
+        population (Optional[numpy.ndarray]): Array of individuals vectors.
+        population_fitness (Optional[numpy.ndarray]): Population fitness.
+        best_solution (Optional[numpy.ndarray]): Best solution in the
+            population.
+        best_fitness (Optional[float]): Fitness of the best solution in
+            the population.
+        metrics_values (Dict[str, np.ndarray]): Dictionary of population
+            diversity metrics values.
     """
 
     def __init__(
@@ -108,7 +108,7 @@ class PopulationData:
         r"""Archive the population data and calculate diversity metrics.
 
         Args:
-            population (Optional[numpy.ndarray]): Population.
+            population (Optional[numpy.ndarray]): Array of individuals vectors.
             population_fitness (Optional[numpy.ndarray]): Population fitness.
             best_solution (Optional[numpy.ndarray]): Best solution in the
                 population.
@@ -147,21 +147,21 @@ class PopulationData:
 
     def get_population_or_empty(self):
         if self.population is None:
-            return np.array()
+            return np.array([])
         else:
             return self.population
 
     def get_population_fitness_or_empty(self):
         if self.population_fitness is None:
-            return np.array()
+            return np.array([])
         else:
             return self.population_fitness
 
 
 class SingleRunData:
-    r"""Class for archiving optimization run data.
+    r"""Class used for the archiving of the optimization run data.
     Contains list of population data through iterations, run details such as
-    problem used, algorithm used etc.
+    problem used, algorithm used, diversity metrics values etc.
 
     Attributes:
         algorithm_name (Optional[str]): Algorithm name.
@@ -170,8 +170,8 @@ class SingleRunData:
         problem_name (Optional[str]): Problem name.
         max_evals (Optional[int]): Maximum number of function evaluations.
         max_iters (Optional[int]): Maximum number of generations or iterations.
-        rng_seed (Optional[int]): Seed of the random generator used for
-            optimization.
+        rng_seed (Optional[int]): Seed of the random generator used for the
+            initialization of the population.
         evals (int): number of evaluations used.
         populations (List[PopulationData]): list of populations recorded
             during the solving of the problem.
@@ -363,6 +363,9 @@ class SingleRunData:
         Returns:
             similarity (float | numpy.ndarray[float]): mean 1-SMAPE value or array of 1-SMAPE
                 values if get_raw_values is true.
+
+        Raises:
+            Warning: Mismatch in population diversity metrics length
         """
         first_im = self.get_indiv_diversity_metrics_values().to_numpy().transpose()
         first_pm = self.get_pop_diversity_metrics_values().to_numpy().transpose()
@@ -370,8 +373,20 @@ class SingleRunData:
         second_im = second.get_indiv_diversity_metrics_values().to_numpy().transpose()
         second_pm = second.get_pop_diversity_metrics_values().to_numpy().transpose()
 
+        if first_pm.shape != second_pm.shape:
+            warnings.warn(
+                f"""\nMismatch in the length of the population diversity metrics arrays during similarity calculation,
+                {first_pm.shape[1]} != {second_pm.shape[1]}. This is most likely due to algorithms completing different
+                number of generations under common `max_evals` limit. Shorter of both diversity metrics arrays will be
+                padded with zeros!""",
+                Warning,
+            )
         smape_values = []
         for fpm, spm in zip(first_pm, second_pm):
+            if len(fpm) < len(spm):
+                fpm = np.pad(fpm, (0, len(spm) - len(fpm)), "constant", constant_values=(0, 0))
+            elif len(spm) < len(fpm):
+                spm = np.pad(spm, (0, len(fpm) - len(spm)), "constant", constant_values=(0, 0))
             smape_values.append(smape(fpm, spm))
 
         for fim, sim in zip(first_im, second_im):

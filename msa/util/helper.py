@@ -1,7 +1,6 @@
 import numpy as np
 import numpy.typing as npt
 import math
-import time
 from niapy.algorithms.algorithm import Algorithm
 from niapy.util.factory import (
     _algorithm_options,
@@ -54,7 +53,17 @@ def get_algorithm_by_name(name: str | Algorithm, *args, **kwargs):
         return get_algorithm(name, *args, **kwargs)
 
 
-def timer(start, end):
+def timer(start: float, end: float):
+    """Get a formatted string o elapsed time.
+
+    Args:
+        start (float): start time in seconds.
+        end (float): end time in seconds.
+
+    Returns:
+        elapsed (str): A formatted string of elapsed time.
+    """
+
     hours, rem = divmod(end - start, 3600)
     minutes, seconds = divmod(rem, 60)
     return "{:0>2}:{:0>2}:{:05.2f}".format(int(hours), int(minutes), seconds)
