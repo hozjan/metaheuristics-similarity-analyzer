@@ -1,4 +1,4 @@
-from msa.tools.optimization_data import PopulationData, PopDiversityMetric
+from mhsa.tools.optimization_data import PopulationData, PopDiversityMetric
 from niapy.util.distances import euclidean
 
 __all__ = ['PED']

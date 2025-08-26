@@ -1,9 +1,9 @@
-# MSA - Metaheuristics Similarity Analyzer
+# MHSA - Metaheuristics Similarity Analyzer
 
-This repository contains the source code of the experiments in the paper ***Measuring the similarity of metaheuristic search strategies with machine learning models***. MSA provides an alternative way to compare and analyze metaheuristic-search strategies with the help of machine learning.
+This repository contains the source code of the experiments in the paper ***Measuring the similarity of metaheuristic search strategies with machine learning models***. MHSA provides an alternative way to compare and analyze metaheuristic-search strategies with the help of machine learning.
 
 ## Usage
-To use MSA for similarity analysis we first have to define the gene spaces which will be used by the genetic algorithm. First key of the gene space dictionary must correspond with the class name of the the algorithm which must be implemented in the [NiaPy](https://github.com/NiaOrg/NiaPy?tab=readme-ov-file) micro-framework. In this case we chose `BatAlgorithm` and `ParticleSwarmAlgorithm`.
+To use MHSA for similarity analysis we first have to define the gene spaces which will be used by the genetic algorithm. First key of the gene space dictionary must correspond with the class name of the the algorithm which must be implemented in the [NiaPy](https://github.com/NiaOrg/NiaPy?tab=readme-ov-file) micro-framework. In this case we chose `BatAlgorithm` and `ParticleSwarmAlgorithm`.
 
 ```python
 PSA_gene_spaces = {
@@ -25,15 +25,15 @@ BA_gene_spaces = {
 We also have to chose diversity metrics which will be used as the basis of the analysis and the optimization problem the metaheuristics are going to solve.
 
 ```python
-from msa.diversity_metrics.population_diversity.dpc import DPC
-from msa.diversity_metrics.population_diversity.fdc import FDC
-from msa.diversity_metrics.population_diversity.pfsd import PFSD
-from msa.diversity_metrics.population_diversity.pfm import PFM
-from msa.diversity_metrics.individual_diversity.idt import IDT
-from msa.diversity_metrics.individual_diversity.isi import ISI
-from msa.diversity_metrics.individual_diversity.ifm import IFM
-from msa.diversity_metrics.individual_diversity.ifiqr import IFIQR
-from msa.problems.schwefel import Schwefel
+from mhsa.diversity_metrics.population_diversity.dpc import DPC
+from mhsa.diversity_metrics.population_diversity.fdc import FDC
+from mhsa.diversity_metrics.population_diversity.pfsd import PFSD
+from mhsa.diversity_metrics.population_diversity.pfm import PFM
+from mhsa.diversity_metrics.individual_diversity.idt import IDT
+from mhsa.diversity_metrics.individual_diversity.isi import ISI
+from mhsa.diversity_metrics.individual_diversity.ifm import IFM
+from mhsa.diversity_metrics.individual_diversity.ifiqr import IFIQR
+from mhsa.problems.schwefel import Schwefel
 
 OPTIMIZATION_PROBLEM = Schwefel(dimension=20)
 
@@ -54,7 +54,7 @@ INDIV_DIVERSITY_METRICS = [
 In the next step we have to instantiate the `MetaGA` class which uses the `GA` class from the [PyGAD](https://github.com/ahmedfgad/GeneticAlgorithmPython) library. At this point we decide which of the algorithms will be analyzed and which will be the "reference" or "target" algorithm. The gene space of the analyzed algorithm gets assigned to the `gene_spaces` argument of the `MetaGA`.
 
 ```python
-from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
+from mhsa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 
 meta_ga = MetaGA(
     fitness_function_type=MetaGAFitnessFunction.TARGET_PERFORMANCE_SIMILARITY,
@@ -81,11 +81,11 @@ meta_ga = MetaGA(
 In the last step we have to instantiate the `MetaheuristicSimilarityAnalyzer` class and pass it the configured `MetaGA` instance and the gene space of the target algorithm. Then we simply call the `run_similarity_analysis` method to start the analysis.
 
 ```python
-from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
+from mhsa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
 
-msa = MetaheuristicsSimilarityAnalyzer(meta_ga=meta_ga, target_gene_space=PSA_gene_spaces)
+mhsa = MetaheuristicsSimilarityAnalyzer(meta_ga=meta_ga, target_gene_space=PSA_gene_spaces)
 
-msa.run_similarity_analysis(
+mhsa.run_similarity_analysis(
     num_comparisons=10
     get_info=True,
     generate_dataset=True,
@@ -97,7 +97,7 @@ msa.run_similarity_analysis(
 After the analysis we can choose to export results of the analysis as a .pdf and/or .tex file with `export_results_to_latex` method or access them trough the `MetaheuristicsSimilarityAnalyzer` class instance.
 
 ```python
-msa.export_results_to_latex(generate_pdf=True)
+mhsa.export_results_to_latex(generate_pdf=True)
 ```
 For more information check out [examples](/examples).
 

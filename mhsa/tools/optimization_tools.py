@@ -10,7 +10,7 @@ import numpy as np
 from numpy.random import default_rng
 from pathlib import Path
 
-from msa.tools.optimization_data import PopDiversityMetric, IndivDiversityMetric, SingleRunData, PopulationData
+from mhsa.tools.optimization_data import PopDiversityMetric, IndivDiversityMetric, SingleRunData, PopulationData
 
 __all__ = ["optimization", "optimization_worker", "optimization_runner", "get_sorted_list_of_runs"]
 

@@ -1,5 +1,5 @@
 import numpy as np
-from msa.tools.optimization_data import PopulationData, PopDiversityMetric
+from mhsa.tools.optimization_data import PopulationData, PopDiversityMetric
 from niapy.util.distances import euclidean
 from niapy.problems import Problem
 import math

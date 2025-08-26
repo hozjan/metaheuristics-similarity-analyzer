@@ -16,10 +16,10 @@ from matplotlib import pyplot as plt
 from pylatex import Document, Section, Subsection
 from pylatex import MultiColumn, Package, LongTable
 from pylatex.utils import bold, NoEscape
-from msa.util.helper import random_float_with_step, get_algorithm_by_name, timer
-from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
-from msa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
-from msa.tools.optimization_data import SingleRunData
+from mhsa.util.helper import random_float_with_step, get_algorithm_by_name, timer
+from mhsa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
+from mhsa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
+from mhsa.tools.optimization_data import SingleRunData
 import numpy as np
 import numpy.typing as npt
 from scipy import spatial, stats
@@ -52,8 +52,8 @@ class MetaheuristicsSimilarityAnalyzer:
             `TARGET_PERFORMANCE_SIMILARITY`.
         target_gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]):
             Gene space of the target/reference metaheuristic.
-        base_archive_path (str): Base archive path of the MSA. Used for dataset location.
-        archive_path (str): Archive path of the MSA including `base_archive_path` followed by /`prefix`_.
+        base_archive_path (str): Base archive path of the MHSA. Used for dataset location.
+        archive_path (str): Archive path of the MHSA including `base_archive_path` followed by /`prefix`_.
             Generated when calling `run_similarity_analysis`.
         dataset_path (str): Path of the generated dataset including `archive_path`.
         target_solutions (list[np.ndarray]): List of target solutions used for the target (reference)
@@ -77,7 +77,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 `TARGET_PERFORMANCE_SIMILARITY`.
             target_gene_space (dict[str | Algorithm, dict[str, dict[str, float]]]):
                 Gene space of the target/reference metaheuristic.
-            base_archive_path (Optional[str]): Base archive path of the MSA. Used for dataset location.
+            base_archive_path (Optional[str]): Base archive path of the MHSA. Used for dataset location.
 
         Raises:
             ValueError: Incorrect `fitness_function_type` value assigned to meta_ga.
@@ -314,7 +314,7 @@ class MetaheuristicsSimilarityAnalyzer:
         calculate_similarity_metrics: bool = False,
         prefix: str | None = None,
         export: bool = False,
-        pkl_filename: str = "msa_obj",
+        pkl_filename: str = "mhsa_obj",
     ):
         r"""Run metaheuristic similarity analysis.
 
@@ -342,7 +342,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 `generate_dataset` is false.
             prefix (Optional[str]): Use custom prefix for the name of the base
                 folder in structure. Uses current datetime by default.
-            export (Optional[bool]): Export MSA object to pkl after analysis.
+            export (Optional[bool]): Export MHSA object to pkl after analysis.
             pkl_filename (Optional[str]): Filename of the exported .pkl file.
                 Used if `export` is true.
 
@@ -371,8 +371,8 @@ class MetaheuristicsSimilarityAnalyzer:
         self.meta_ga.base_archive_path = self.archive_path
 
         if get_info:
-            self.msa_info(
-                filename=os.path.join(self.archive_path, "msa_info"),
+            self.mhsa_info(
+                filename=os.path.join(self.archive_path, "mhsa_info"),
             )
 
         start = time.time()
@@ -419,9 +419,9 @@ class MetaheuristicsSimilarityAnalyzer:
         """
         self.__absolute_dirname = None
         filename = os.path.join(self.archive_path, filename)
-        msa = cloudpickle.dumps(self)
+        mhsa = cloudpickle.dumps(self)
         with open(filename + ".pkl", "wb") as file:
-            file.write(msa)
+            file.write(mhsa)
             cloudpickle.dump(self, file)
 
     @staticmethod
@@ -433,7 +433,7 @@ class MetaheuristicsSimilarityAnalyzer:
             filename (str): Filename of the file to import. File extension .pkl included upon import.
 
         Returns:
-            msa (MetaheuristicSimilarityAnalyzer): Metaheuristic similarity analyzer instance.
+            mhsa (MetaheuristicSimilarityAnalyzer): Metaheuristic similarity analyzer instance.
 
         Raises:
             FileNotFoundError: File not found.
@@ -443,15 +443,15 @@ class MetaheuristicsSimilarityAnalyzer:
 
         try:
             with open(filename + ".pkl", "rb") as file:
-                msa = cloudpickle.load(file)
+                mhsa = cloudpickle.load(file)
         except FileNotFoundError:
             raise FileNotFoundError(f"File {filename}.pkl not found.")
         except Exception:
             raise BaseException(f"File {filename}.pkl could not be loaded.")
-        msa.__absolute_dirname = os.path.join(os.getcwd(), os.path.dirname(filename))
-        if not isinstance(msa, MetaheuristicsSimilarityAnalyzer):
+        mhsa.__absolute_dirname = os.path.join(os.getcwd(), os.path.dirname(filename))
+        if not isinstance(mhsa, MetaheuristicsSimilarityAnalyzer):
             raise TypeError("Provided .pkl file is not a `MetaheuristicsSimilarityAnalyzer` export.")
-        return msa
+        return mhsa
 
     def __import_comparison_meta_ga(self, comparison_index: int) -> Tuple[str, MetaGA]:
         r"""Imports MetaGA object of the selected comparison.
@@ -861,7 +861,7 @@ class MetaheuristicsSimilarityAnalyzer:
         return accuracy
 
     def export_results_to_latex(self, filename: str | None = None, generate_pdf: bool = False):
-        r"""Generate latex file containing MSA results in form of tables.
+        r"""Generate latex file containing MHSA results in form of tables.
         Optionally also generate pdf file.
 
         Args:
@@ -915,7 +915,7 @@ class MetaheuristicsSimilarityAnalyzer:
         else:
             archive_path = self.archive_path
         if filename is None:
-            filename = f"{self.__target_alg_abbr}-{self.__optimized_alg_abbr}_MSA_results"
+            filename = f"{self.__target_alg_abbr}-{self.__optimized_alg_abbr}_MHSA_results"
         if generate_pdf:
             doc.generate_pdf(
                 os.path.join(
@@ -1127,9 +1127,9 @@ class MetaheuristicsSimilarityAnalyzer:
         fitness_table.add_hline()
         return fitness_table
 
-    def msa_info(
+    def mhsa_info(
         self,
-        filename: str = "msa_info",
+        filename: str = "mhsa_info",
         table_background_color: str = "white",
         table_border_color: str = "black",
         graph_color: str = "grey",
@@ -1145,7 +1145,7 @@ class MetaheuristicsSimilarityAnalyzer:
             sub_graph_color (Optional[str]): Sub graph background color.
         """
 
-        gv = graphviz.Digraph("msa_info", filename=filename)
+        gv = graphviz.Digraph("mhsa_info", filename=filename)
         gv.attr(rankdir="TD", compound="true")
         gv.attr("node", shape="box")
         gv.attr("graph", fontname="bold")
@@ -1155,7 +1155,7 @@ class MetaheuristicsSimilarityAnalyzer:
             c.attr(
                 style="filled",
                 color=graph_color,
-                name="msa",
+                name="mhsa",
                 label="Metaheuristics Similarity Analyzer",
             )
             c.node_attr.update(
@@ -1165,7 +1165,7 @@ class MetaheuristicsSimilarityAnalyzer:
                 shape="plaintext",
                 margin="0",
             )
-            msa_parameters_label = f"""<
+            mhsa_parameters_label = f"""<
                 <table border="0" cellborder="1" cellspacing="0">
                     <tr>
                         <td colspan="2"><b>Parameters</b></td>
@@ -1179,7 +1179,7 @@ class MetaheuristicsSimilarityAnalyzer:
                         <td>{self.meta_ga.num_runs}</td>
                     </tr>
                 </table>>"""
-            c.node(name="msa_parameters", label=msa_parameters_label)
+            c.node(name="mhsa_parameters", label=mhsa_parameters_label)
 
             with c.subgraph(name="cluster_00") as cc:
                 cc.attr(

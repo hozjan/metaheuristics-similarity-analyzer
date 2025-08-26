@@ -2,18 +2,18 @@ from unittest import TestCase
 import numpy as np
 import shutil
 import os
-from msa.diversity_metrics.population_diversity.dpc import DPC
-from msa.diversity_metrics.population_diversity.fdc import FDC
-from msa.diversity_metrics.population_diversity.pfsd import PFSD
-from msa.diversity_metrics.population_diversity.pfm import PFM
-from msa.diversity_metrics.individual_diversity.idt import IDT
-from msa.diversity_metrics.individual_diversity.isi import ISI
-from msa.diversity_metrics.individual_diversity.ifm import IFM
-from msa.diversity_metrics.individual_diversity.ifiqr import IFIQR
-from msa.tools.optimization_tools import get_sorted_list_of_runs
+from mhsa.diversity_metrics.population_diversity.dpc import DPC
+from mhsa.diversity_metrics.population_diversity.fdc import FDC
+from mhsa.diversity_metrics.population_diversity.pfsd import PFSD
+from mhsa.diversity_metrics.population_diversity.pfm import PFM
+from mhsa.diversity_metrics.individual_diversity.idt import IDT
+from mhsa.diversity_metrics.individual_diversity.isi import ISI
+from mhsa.diversity_metrics.individual_diversity.ifm import IFM
+from mhsa.diversity_metrics.individual_diversity.ifiqr import IFIQR
+from mhsa.tools.optimization_tools import get_sorted_list_of_runs
 from niapy.problems.schwefel import Schwefel
-from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
-from msa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
+from mhsa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
+from mhsa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
 
 GENE_SPACE = {
     "BatAlgorithm": {
@@ -59,7 +59,7 @@ class TestTargetSimilarity(TestCase):
 
     def test_target_similarity_analysis(self):
         # Arrange
-        pkl_filename = "msa_obj"
+        pkl_filename = "mhsa_obj"
         num_runs = 100
 
         meta_ga = MetaGA(
@@ -115,7 +115,7 @@ class TestTargetSimilarity(TestCase):
 
     def test_target_similarity_analysis_target_solutions(self):
         # Arrange
-        pkl_filename = "msa_obj"
+        pkl_filename = "mhsa_obj"
         num_runs = 100
 
         meta_ga = MetaGA(

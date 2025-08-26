@@ -1,5 +1,5 @@
 import numpy as np
-from msa.tools.optimization_data import PopulationData, SingleRunData
+from mhsa.tools.optimization_data import PopulationData, SingleRunData
 from niapy.problems import Problem
 
 

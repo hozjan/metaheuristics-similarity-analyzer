@@ -1,13 +1,13 @@
 from unittest import TestCase
 from tests.diversity_metrics_tests.util.optimization_data import GeneratePopulationData
-from msa.diversity_metrics.population_diversity.dpc import DPC
-from msa.diversity_metrics.population_diversity.fdc import FDC
-from msa.diversity_metrics.population_diversity.aad import AAD
-from msa.diversity_metrics.population_diversity.pdi import PDI
-from msa.diversity_metrics.population_diversity.ped import PED
-from msa.diversity_metrics.population_diversity.pfm import PFM
-from msa.diversity_metrics.population_diversity.pfsd import PFSD
-from msa.diversity_metrics.population_diversity.pmd import PMD
+from mhsa.diversity_metrics.population_diversity.dpc import DPC
+from mhsa.diversity_metrics.population_diversity.fdc import FDC
+from mhsa.diversity_metrics.population_diversity.aad import AAD
+from mhsa.diversity_metrics.population_diversity.pdi import PDI
+from mhsa.diversity_metrics.population_diversity.ped import PED
+from mhsa.diversity_metrics.population_diversity.pfm import PFM
+from mhsa.diversity_metrics.population_diversity.pfsd import PFSD
+from mhsa.diversity_metrics.population_diversity.pmd import PMD
 from niapy.problems.sphere import Sphere
 
 DIMENSION = 5
