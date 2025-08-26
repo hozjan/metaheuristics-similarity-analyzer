@@ -2,7 +2,7 @@ from unittest import TestCase
 import os
 import shutil
 from niapy.problems.schwefel import Schwefel
-from msa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
+from mhsa.tools.meta_ga import MetaGA, MetaGAFitnessFunction
 
 
 GENE_SPACE = {

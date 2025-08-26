@@ -7,13 +7,13 @@ from datetime import datetime
 from pathlib import Path
 import numpy as np
 import pygad
-from msa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
-from msa.tools.optimization_data import (
+from mhsa.tools.optimization_tools import optimization_runner, get_sorted_list_of_runs
+from mhsa.tools.optimization_data import (
     SingleRunData,
     IndivDiversityMetric,
     PopDiversityMetric,
 )
-from msa.util.helper import get_algorithm_by_name, timer
+from mhsa.util.helper import get_algorithm_by_name, timer
 import shutil
 import logging
 import graphviz
@@ -539,7 +539,7 @@ class MetaGA:
             filename (str): Filename of the file to import. File extension .pkl included upon import.
 
         Returns:
-            msa (MetaGA): MetaGA instance.
+            mhsa (MetaGA): MetaGA instance.
 
         Raises:
             FileNotFoundError: File not found.

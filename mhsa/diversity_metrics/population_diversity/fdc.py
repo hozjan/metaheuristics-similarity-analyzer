@@ -1,7 +1,7 @@
 from niapy.util.array import full_array
 import numpy as np
 import itertools
-from msa.tools.optimization_data import PopulationData, PopDiversityMetric
+from mhsa.tools.optimization_data import PopulationData, PopDiversityMetric
 from niapy.problems import Problem
 
 __all__ = ["FDC"]

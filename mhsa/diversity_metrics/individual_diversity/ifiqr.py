@@ -1,6 +1,6 @@
 import numpy as np
 import scipy
-from msa.tools.optimization_data import SingleRunData, IndivDiversityMetric
+from mhsa.tools.optimization_data import SingleRunData, IndivDiversityMetric
 
 __all__ = ['IFIQR']
 

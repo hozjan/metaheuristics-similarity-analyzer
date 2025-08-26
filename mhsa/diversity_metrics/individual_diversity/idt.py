@@ -1,5 +1,5 @@
 import numpy as np
-from msa.tools.optimization_data import SingleRunData, IndivDiversityMetric
+from mhsa.tools.optimization_data import SingleRunData, IndivDiversityMetric
 
 __all__ = ["IDT"]
 

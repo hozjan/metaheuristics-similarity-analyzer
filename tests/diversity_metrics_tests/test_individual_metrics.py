@@ -1,10 +1,10 @@
 from unittest import TestCase
 import numpy as np
 from tests.diversity_metrics_tests.util.optimization_data import GenerateSingleRunData
-from msa.diversity_metrics.individual_diversity.idt import IDT
-from msa.diversity_metrics.individual_diversity.ifiqr import IFIQR
-from msa.diversity_metrics.individual_diversity.ifm import IFM
-from msa.diversity_metrics.individual_diversity.isi import ISI
+from mhsa.diversity_metrics.individual_diversity.idt import IDT
+from mhsa.diversity_metrics.individual_diversity.ifiqr import IFIQR
+from mhsa.diversity_metrics.individual_diversity.ifm import IFM
+from mhsa.diversity_metrics.individual_diversity.isi import ISI
 from niapy.problems.sphere import Sphere
 
 DIMENSION = 2

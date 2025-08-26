@@ -12,7 +12,7 @@ from niapy.problems import Problem
 from sklearn.decomposition import PCA
 import math
 import inspect
-from msa.util.helper import smape
+from mhsa.util.helper import smape
 
 __all__ = ["IndivDiversityMetric", "PopDiversityMetric", "PopulationData", "SingleRunData", "JsonEncoder"]
 
