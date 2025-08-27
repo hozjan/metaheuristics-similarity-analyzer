@@ -1,6 +1,6 @@
 # MHSA - Metaheuristics Similarity Analyzer
 
-This repository contains the source code of the experiments in the paper ***Measuring the similarity of metaheuristic search strategies with machine learning models***. MHSA provides an alternative way to compare and analyze metaheuristic-search strategies with the help of machine learning.
+This repository contains the source code of the experiments in the paper ***Measuring the similarity of metaheuristic search strategies with machine learning models***. `MHSA` provides an alternative way to compare and analyze metaheuristic-search strategies with the help of machine learning.
 
 ## 📦 Installation
 To install `MHSA` with pip, use:
@@ -84,7 +84,7 @@ meta_ga = MetaGA(
 )
 ```
 
-In the last step we have to instantiate the `MetaheuristicSimilarityAnalyzer` class and pass it the configured `MetaGA` instance and the gene space of the target algorithm. Then we simply call the `run_similarity_analysis` method to start the analysis.
+In the last step we have to instantiate the `MetaheuristicsSimilarityAnalyzer` class and pass it the configured `MetaGA` instance and the gene space of the target algorithm. Then we simply call the `run_similarity_analysis` method to start the analysis.
 
 ```python
 from mhsa.tools.metaheuristics_similarity_analyzer import MetaheuristicsSimilarityAnalyzer
